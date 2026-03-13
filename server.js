@@ -19,6 +19,31 @@ app.use(
   })
 );
 app.use(express.static(path.join(__dirname, "public")));
+app.get("/login.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "login.html"));
+});
+
+app.get("/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.redirect("/login.html");
+  });
+});
+
+app.get("/", (req, res) => {
+  if (req.session.user) {
+    return res.redirect("/index.html");
+  }
+  return res.redirect("/login.html");
+});
+
+app.get("/index.html", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+app.get("/admin.html", requireAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -199,31 +224,6 @@ app.get("/api/session", (req, res) => {
     loggedIn: true,
     user: req.session.user
   });
-});
-
-app.get("/login.html", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "login.html"));
-});
-
-app.get("/logout", (req, res) => {
-  req.session.destroy(() => {
-    res.redirect("/login.html");
-  });
-});
-
-app.get("/", (req, res) => {
-  if (req.session.user) {
-    return res.redirect("/index.html");
-  }
-  return res.redirect("/login.html");
-});
-
-app.get("/index.html", requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-app.get("/admin.html", requireAdmin, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 
 //Crear rutas para administrar usuarios - listar usuarios
