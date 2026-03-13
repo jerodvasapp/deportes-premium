@@ -6,6 +6,7 @@ const sqlite3 = require("sqlite3").verbose();
 const bcrypt = require("bcrypt");
 const helmet = require("helmet");
 const path = require("path");
+const { Readable } = require("stream");
 
 const app = express();
 const PORT = process.env.PORT || 3000;

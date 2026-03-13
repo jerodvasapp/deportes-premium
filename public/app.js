@@ -20,7 +20,13 @@ async function checkSession() {
 checkSession();
 
 const CHANNELS = [
-  { name: "ESPN 1", category: "deportes espn", url: "http://167.17.67.240:8888/Espn1/tracks-v1a1/mono.m3u8", type: "hls" },
+  {
+  name: "ESPN 1",
+  category: "deportes espn",
+  url: "/proxy/hls?url=" + encodeURIComponent("http://167.17.67.240:8888/Espn1/tracks-v1a1/mono.m3u8"),
+  type: "hls"
+},
+  /*{ name: "ESPN 1", category: "deportes espn", url: "http://167.17.67.240:8888/Espn1/tracks-v1a1/mono.m3u8", type: "hls" },*/
   { name: "ESPN 2", category: "deportes espn", url: "http://167.17.67.240:8888/Espn2/tracks-v1a1/mono.m3u8", type: "hls" },
   { name: "ESPN 3", category: "deportes espn", url: "http://167.17.67.240:8888/Espn3/tracks-v1a1/mono.m3u8", type: "hls" },
   { name: "ESPN 4", category: "deportes espn", url: "http://167.17.67.240:8888/Espn4/tracks-v1a1/mono.m3u8", type: "hls" },
