@@ -40,6 +40,16 @@ app.use(
 
 app.use(express.static(path.join(__dirname, "public")));
 
+app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/login.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "login.html"));
+});
+
+app.get("/", (req, res) => {
+  res.redirect("/login.html");
+});
+
 db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
