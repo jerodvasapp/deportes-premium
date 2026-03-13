@@ -350,6 +350,129 @@ app.get("/admin/logs", requireAdmin, (req, res) => {
   );
 });
 
+function isAllowedStreamHost(urlString) {
+  try {
+    const url = new URL(urlString);
+    return url.hostname === "167.17.67.240";
+  } catch {
+    return false;
+  }
+}
+
+function rewriteM3U8(content, baseUrl) {
+  const lines = content.split("\n");
+
+  const rewritten = lines.map((line) => {
+    const trimmed = line.trim();
+
+    if (!trimmed || trimmed.startsWith("#")) {
+      return line;
+    }
+
+    try {
+      const absoluteUrl = new URL(trimmed, baseUrl).toString();
+
+      if (absoluteUrl.includes(".m3u8")) {
+        return `/proxy/hls?url=${encodeURIComponent(absoluteUrl)}`;
+      }
+
+      return `/proxy/segment?url=${encodeURIComponent(absoluteUrl)}`;
+    } catch {
+      return line;
+    }
+  });
+
+  return rewritten.join("\n");
+}
+
+app.get("/proxy/hls", async (req, res) => {
+  try {
+    const targetUrl = req.query.url;
+
+    if (!targetUrl || typeof targetUrl !== "string") {
+      return res.status(400).send("Falta la URL del stream");
+    }
+
+    if (!isAllowedStreamHost(targetUrl)) {
+      return res.status(403).send("Host no permitido");
+    }
+
+    const upstream = await fetch(targetUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/vnd.apple.mpegurl, application/x-mpegURL, */*"
+      }
+    });
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).send(`Error cargando playlist: ${upstream.status}`);
+    }
+
+    const originalText = await upstream.text();
+    const proxiedText = rewriteM3U8(originalText, targetUrl);
+
+    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(proxiedText);
+  } catch (error) {
+    console.error("Error en /proxy/hls:", error);
+    return res.status(500).send("Error cargando playlist HLS");
+  }
+});
+
+app.get("/proxy/segment", async (req, res) => {
+  try {
+    const targetUrl = req.query.url;
+
+    if (!targetUrl || typeof targetUrl !== "string") {
+      return res.status(400).send("Falta la URL del segmento");
+    }
+
+    if (!isAllowedStreamHost(targetUrl)) {
+      return res.status(403).send("Host no permitido");
+    }
+
+    const headers = {
+      "User-Agent": "Mozilla/5.0",
+      "Accept": "*/*"
+    };
+
+    if (req.headers.range) {
+      headers.Range = req.headers.range;
+    }
+
+    const upstream = await fetch(targetUrl, { headers });
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).send(`Error cargando segmento: ${upstream.status}`);
+    }
+
+    const contentType = upstream.headers.get("content-type");
+    const contentLength = upstream.headers.get("content-length");
+    const acceptRanges = upstream.headers.get("accept-ranges");
+    const contentRange = upstream.headers.get("content-range");
+    const cacheControl = upstream.headers.get("cache-control");
+
+    if (contentType) res.setHeader("Content-Type", contentType);
+    if (contentLength) res.setHeader("Content-Length", contentLength);
+    if (acceptRanges) res.setHeader("Accept-Ranges", acceptRanges);
+    if (contentRange) res.setHeader("Content-Range", contentRange);
+    if (cacheControl) res.setHeader("Cache-Control", cacheControl);
+
+    res.status(upstream.status);
+
+    if (!upstream.body) {
+      return res.end();
+    }
+
+    Readable.fromWeb(upstream.body).pipe(res);
+  } catch (error) {
+    console.error("Error en /proxy/segment:", error);
+    return res.status(500).send("Error cargando segmento HLS");
+  }
+});
+
+
 //finalizar servidor
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
