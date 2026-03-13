@@ -354,3 +354,8 @@ app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
 
+app.use((err, req, res, next) => {
+  console.error("ERROR NO CONTROLADO:", err);
+  res.status(500).send("Internal Server Error");
+});
+
