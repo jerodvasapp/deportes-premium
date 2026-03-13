@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Panel de administración de Deportes Premium" />
+  <title>🛠️ Admin | Deportes Premium</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #07111f;
+    --bg-2: #0b1730;
+    --panel: rgba(12, 19, 36, 0.88);
+    --panel-solid: #0d1728;
+    --panel-2: rgba(255, 255, 255, 0.04);
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.12);
+    --text: #f5f7ff;
+    --muted: #9fb0cf;
+    --accent: #00c2ff;
+    --accent-2: #355cff;
+    --success: #25d366;
+    --warning: #ffb020;
+    --danger: #ff5b73;
+    --shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+    --radius: 22px;
+    --radius-md: 16px;
+    --radius-sm: 12px;
+    --transition: 0.2s ease;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Poppins", sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(circle at 15% 15%, rgba(0, 194, 255, 0.15), transparent 22%),
+      radial-gradient(circle at 85% 10%, rgba(53, 92, 255, 0.12), transparent 20%),
+      radial-gradient(circle at 50% 100%, rgba(255, 77, 103, 0.08), transparent 25%),
+      linear-gradient(180deg, #07111f 0%, #0b1730 50%, #09121f 100%);
+  }
+
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  input,
+  select,
+  textarea {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(6, 14, 28, 0.72);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  .brand h1 {
+    margin: 0;
+    font-size: 1.7rem;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .brand p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .header-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--line);
+    color: #dce9ff;
+    font-size: 0.88rem;
+    line-height: 1.2;
+  }
+
+  .header-link,
+  .action-btn,
+  .mini-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    border: 0;
+    cursor: pointer;
+    font-family: inherit;
+    transition:
+      transform var(--transition),
+      opacity var(--transition),
+      filter var(--transition),
+      background var(--transition),
+      border-color var(--transition);
+  }
+
+  .header-link:focus-visible,
+  .action-btn:focus-visible,
+  .mini-btn:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    outline: 2px solid rgba(0, 194, 255, 0.55);
+    outline-offset: 2px;
+  }
+
+  .header-link {
+    min-height: 40px;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    color: white;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 12px 28px rgba(0, 194, 255, 0.18);
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .header-link:hover,
+  .action-btn:hover,
+  .mini-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.03);
+  }
+
+  .header-link.secondary {
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+    border: 1px solid var(--line);
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 20px;
+    padding: 24px;
+  }
+
+  .panel {
+    background: var(--panel-solid);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+
+  .panel-header {
+    padding: 18px 18px 0;
+  }
+
+  .panel-header h2 {
+    margin: 0;
+    font-size: 1.08rem;
+    line-height: 1.2;
+  }
+
+  .panel-header p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .panel-body {
+    padding: 18px;
+  }
+
+  .field {
+    margin-bottom: 12px;
+  }
+
+  .field label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    color: #dbe7ff;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+
+  .field input,
+  .field select,
+  .toolbar input,
+  .compact-input,
+  .compact-select {
+    width: 100%;
+    min-height: 46px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    outline: none;
+    transition:
+      border-color var(--transition),
+      box-shadow var(--transition),
+      background var(--transition);
+  }
+
+  .compact-input,
+  .compact-select {
+    min-height: 36px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 0.86rem;
+  }
+
+  .field input::placeholder,
+  .toolbar input::placeholder {
+    color: #8fa5ca;
+    opacity: 1;
+  }
+
+  .field input:focus,
+  .field select:focus,
+  .toolbar input:focus,
+  .compact-input:focus,
+  .compact-select:focus {
+    border-color: rgba(0, 194, 255, 0.35);
+    box-shadow: 0 0 0 4px rgba(0, 194, 255, 0.15);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .field select option,
+  .compact-select option {
+    color: #111;
+  }
+
+  .action-btn {
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: white;
+    font-weight: 700;
+    font-size: 0.95rem;
+    box-shadow: 0 14px 30px rgba(0, 194, 255, 0.18);
+  }
+
+  .action-btn.secondary {
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+    border: 1px solid var(--line);
+    margin-top: 10px;
+  }
+
+  .msg {
+    min-height: 20px;
+    margin-top: 10px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+
+  .stat-card {
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .stat-label {
+    color: var(--muted);
+    font-size: 0.86rem;
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  .toolbar input {
+    width: 320px;
+    max-width: 100%;
+    min-height: 42px;
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+
+  .table-shell {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  table {
+    width: 100%;
+    min-width: 1100px;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    background: rgba(255, 255, 255, 0.05);
+    color: #dce9ff;
+    font-size: 0.86rem;
+    font-weight: 600;
+    text-align: left;
+    padding: 14px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    line-height: 1.3;
+  }
+
+  tbody td {
+    padding: 14px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    vertical-align: top;
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .current-user-row {
+    box-shadow: inset 3px 0 0 0 var(--accent);
+    background: rgba(0, 194, 255, 0.04);
+  }
+
+  .user-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .user-name {
+    font-weight: 600;
+    word-break: break-word;
+  }
+
+  .user-id {
+    color: var(--muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .badge-role {
+    background: rgba(0, 194, 255, 0.16);
+    color: #99ecff;
+  }
+
+  .badge-active {
+    background: rgba(37, 211, 102, 0.16);
+    color: #9ff0b8;
+  }
+
+  .badge-suspended {
+    background: rgba(255, 91, 115, 0.16);
+    color: #ffbcc6;
+  }
+
+  .mini-btn {
+    min-height: 34px;
+    padding: 7px 10px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    color: white;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--line);
+    margin: 2px;
+    white-space: nowrap;
+  }
+
+  .mini-btn.save {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border: none;
+  }
+
+  .mini-btn.suspend {
+    background: linear-gradient(135deg, #ff5b73, #d90429);
+    border: none;
+  }
+
+  .mini-btn.activate {
+    background: linear-gradient(135deg, #00b86b, #25d366);
+    border: none;
+  }
+
+  .mini-btn.pass {
+    background: linear-gradient(135deg, #ffb020, #ff8c00);
+    border: none;
+  }
+
+  .mini-btn.delete {
+    background: linear-gradient(135deg, #7a1f2b, #b00020);
+    border: none;
+  }
+
+  .actions-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .logs-box {
+    display: grid;
+    gap: 10px;
+  }
+
+  .log-card {
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .log-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  .log-user {
+    font-weight: 600;
+    word-break: break-word;
+  }
+
+  .log-date {
+    color: var(--muted);
+    font-size: 0.84rem;
+    line-height: 1.4;
+  }
+
+  .log-meta {
+    color: #dbe7ff;
+    font-size: 0.86rem;
+    line-height: 1.6;
+    word-break: break-word;
+  }
+
+  .log-ok {
+    color: #9ff0b8;
+    font-weight: 600;
+  }
+
+  .log-bad {
+    color: #ffbcc6;
+    font-weight: 600;
+  }
+
+  .empty-state {
+    padding: 20px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  @media (max-width: 1100px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+
+    .stats-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    header {
+      padding: 16px;
+      align-items: flex-start;
+    }
+
+    .brand h1 {
+      font-size: 1.4rem;
+    }
+
+    .layout {
+      padding: 16px;
+      gap: 16px;
+    }
+
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .panel-header,
+    .panel-body {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
+
+    .header-actions {
+      width: 100%;
+    }
+
+    .header-link,
+    .header-badge {
+      width: 100%;
+    }
+
+    .toolbar {
+      align-items: stretch;
+    }
+
+    .toolbar input {
+      width: 100%;
+    }
+  }
+
+  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    header {
+      background: rgba(6, 14, 28, 0.96);
+    }
+
+    .panel {
+      background: #0d1728;
+    }
+  }
+</style>  
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>Deportes Premium</h1>
+      <p>Panel de administración IPTV</p>
+    </div>
+
+    <div class="header-actions">
+      <span class="header-badge" id="adminBadge">Administrador</span>
+      <a class="header-link secondary" href="/index.html">Ir al reproductor</a>
+      <a class="header-link" href="/logout">Cerrar sesión</a>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Crear usuario</h2>
+        <p>Agrega accesos con fechas de inicio, finalización y estado.</p>
+      </div>
+
+      <div class="panel-body">
+        <form id="createUserForm">
+          <div class="field">
+            <label for="username">Usuario</label>
+            <input id="username" type="text" placeholder="Ej: cliente01" required />
+          </div>
+
+          <div class="field">
+            <label for="password">Contraseña</label>
+            <input id="password" type="password" placeholder="Contraseña" required />
+          </div>
+
+          <div class="field">
+            <label for="role">Rol</label>
+            <select id="role">
+              <option value="user">user</option>
+              <option value="admin">admin</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="start_date">Fecha inicio</label>
+            <input id="start_date" type="date" />
+          </div>
+
+          <div class="field">
+            <label for="end_date">Fecha fin</label>
+            <input id="end_date" type="date" />
+          </div>
+
+          <div class="field">
+            <label for="status">Estado</label>
+            <select id="status">
+              <option value="activo">activo</option>
+              <option value="suspendido">suspendido</option>
+            </select>
+          </div>
+
+          <button class="action-btn" type="submit">Crear usuario</button>
+          <button class="action-btn secondary" id="reloadAllBtn" type="button">Actualizar datos</button>
+          <div class="msg" id="createMsg"></div>
+        </form>
+      </div>
+    </section>
+
+    <section>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total usuarios</div>
+          <div class="stat-value" id="statTotal">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Activos</div>
+          <div class="stat-value" id="statActive">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Suspendidos</div>
+          <div class="stat-value" id="statSuspended">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Administradores</div>
+          <div class="stat-value" id="statAdmins">0</div>
+        </div>
+      </div>
+
+      <div class="panel panel-spacing">
+        <div class="panel-body">
+          <div class="toolbar">
+            <h2 class="section-title">Usuarios</h2>
+            <input id="searchUser" type="text" placeholder="Buscar usuario, rol o estado..." />
+          </div>
+
+          <div class="table-shell">
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th>Inicio</th>
+                    <th>Fin</th>
+                    <th>Estado</th>
+                    <th>Creado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-body">
+          <div class="toolbar">
+            <h2 class="section-title">Logs de acceso</h2>
+            <button class="action-btn secondary logs-refresh-btn" id="loadLogsBtn" type="button">
+              Actualizar logs
+            </button>
+          </div>
+
+          <div class="logs-box" id="logsBox"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let allUsers = [];
+    let currentAdmin = null;
+
+    async function checkAdminSession() {
+  const res = await fetch("/api/session");
+
+  if (!res.ok) {
+    window.location.href = "/login.html";
+    return;
+  }
+
+  const data = await res.json();
+
+  if (!data.loggedIn) {
+    window.location.href = "/login.html";
+    return;
+  }
+
+  if (!data.user || data.user.role !== "admin") {
+    alert("Acceso denegado: solo administradores");
+    window.location.href = "/index.html";
+    return;
+  }
+
+  currentAdmin = data.user;
+
+  const badge = document.getElementById("adminBadge");
+  if (badge) {
+    badge.textContent = "Admin: " + data.user.username;
+  }
+}
+
+    function escapeHtml(text) {
+      return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function formatValue(value) {
+      return value || "-";
+    }
+
+    function updateStats(users) {
+      document.getElementById("statTotal").textContent = users.length;
+      document.getElementById("statActive").textContent = users.filter(u => u.status === "activo").length;
+      document.getElementById("statSuspended").textContent = users.filter(u => u.status === "suspendido").length;
+      document.getElementById("statAdmins").textContent = users.filter(u => u.role === "admin").length;
+    }
+
+    async function loadUsers() {
+      const res = await fetch("/admin/users");
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        alert(data.message || "No se pudieron cargar los usuarios");
+        return;
+      }
+
+      allUsers = data.users || [];
+      updateStats(allUsers);
+      renderUsers(allUsers);
+    }
+
+    function renderUsers(users) {
+      const tbody = document.getElementById("usersTableBody");
+      tbody.innerHTML = "";
+
+      if (!users.length) {
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">No hay usuarios.</div></td></tr>';
+        return;
+      }
+
+      users.forEach((user) => {
+        const tr = document.createElement("tr");
+        const isCurrentAdmin = currentAdmin && user.id === currentAdmin.id;
+        if (isCurrentAdmin) {
+            tr.classList.add("current-user-row");
+        }
+
+  tr.innerHTML = `
+    <td>
+      <div class="user-main">
+        <span class="user-name">${escapeHtml(user.username)}</span>
+        <span class="user-id">ID: ${user.id}${isCurrentAdmin ? " · Sesión actual" : ""}</span>
+      </div>
+    </td>
+    <td>
+      <select class="compact-select" id="role-${user.id}" ${isCurrentAdmin ? "disabled" : ""}>
+        <option value="user" ${user.role === "user" ? "selected" : ""}>user</option>
+        <option value="admin" ${user.role === "admin" ? "selected" : ""}>admin</option>
+      </select>
+      <div style="margin-top:8px;">
+        <span class="badge badge-role">${escapeHtml(user.role)}</span>
+      </div>
+    </td>
+    <td>
+      <input class="compact-input" id="start-${user.id}" type="date" value="${user.start_date || ""}" />
+    </td>
+    <td>
+      <input class="compact-input" id="end-${user.id}" type="date" value="${user.end_date || ""}" />
+    </td>
+    <td>
+      <select class="compact-select" id="status-${user.id}" ${isCurrentAdmin ? "disabled" : ""}>
+        <option value="activo" ${user.status === "activo" ? "selected" : ""}>activo</option>
+        <option value="suspendido" ${user.status === "suspendido" ? "selected" : ""}>suspendido</option>
+      </select>
+      <div style="margin-top:8px;">
+        <span class="badge ${user.status === "activo" ? "badge-active" : "badge-suspended"}">
+          ${escapeHtml(user.status)}
+        </span>
+      </div>
+    </td>
+    <td>${formatValue(user.created_at)}</td>
+    <td>
+      <div class="actions-cell">
+        <button class="mini-btn save" onclick="updateUser(${user.id})">Guardar</button>
+
+        ${
+          isCurrentAdmin
+            ? ""
+            : user.status === "activo"
+              ? `<button class="mini-btn suspend" onclick="quickSuspend(${user.id})">Suspender</button>`
+              : `<button class="mini-btn activate" onclick="quickActivate(${user.id})">Activar</button>`
+        }
+
+        <button class="mini-btn pass" onclick="changePassword(${user.id}, '${escapeHtml(user.username)}')">Clave</button>
+
+        ${
+          isCurrentAdmin
+            ? ""
+            : `<button class="mini-btn delete" onclick="deleteUser(${user.id}, '${escapeHtml(user.username)}')">Eliminar</button>`
+        }
+      </div>
+    </td>
+  `;
+
+  tbody.appendChild(tr);
+});
+    }
+
+    async function updateUser(id) {
+  const user = allUsers.find(u => u.id === id);
+  const isCurrentAdmin = currentAdmin && currentAdmin.id === id;
+
+  if (isCurrentAdmin) {
+    alert("No puedes cambiar tu propio rol o estado desde esta pantalla.");
+    return;
+  }
+
+  const role = document.getElementById(`role-${id}`).value;
+  const start_date = document.getElementById(`start-${id}`).value || null;
+  const end_date = document.getElementById(`end-${id}`).value || null;
+  const status = document.getElementById(`status-${id}`).value;
+
+  const res = await fetch(`/admin/users/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role, start_date, end_date, status })
+  });
+
+  const data = await res.json();
+  alert(data.message || "Usuario actualizado");
+
+  if (res.ok) {
+    await loadUsers();
+  }
+}
+
+    async function quickActivate(id) {
+  if (currentAdmin && currentAdmin.id === id) {
+    alert("No necesitas activar tu propia cuenta desde aquí.");
+    return;
+  }
+
+  const role = document.getElementById(`role-${id}`).value;
+  const start_date = document.getElementById(`start-${id}`).value || null;
+  const end_date = document.getElementById(`end-${id}`).value || null;
+
+  const res = await fetch(`/admin/users/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      role,
+      start_date,
+      end_date,
+      status: "activo"
+    })
+  });
+
+  const data = await res.json();
+  alert(data.message || "Usuario activado");
+
+  if (res.ok) {
+    await loadUsers();
+  }
+}
+
+    async function changePassword(id, username) {
+      const password = prompt(`Nueva contraseña para ${username}:`);
+      if (!password) return;
+
+      const res = await fetch(`/admin/users/${id}/password`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password })
+      });
+
+      const data = await res.json();
+      alert(data.message || "Contraseña actualizada");
+    }
+
+    async function deleteUser(id, username) {
+  if (currentAdmin && currentAdmin.id === id) {
+    alert("No puedes eliminar tu propia cuenta.");
+    return;
+  }
+
+  const confirmed = confirm(`¿Eliminar al usuario ${username}?`);
+  if (!confirmed) return;
+
+  const res = await fetch(`/admin/users/${id}`, {
+    method: "DELETE"
+  });
+
+  const data = await res.json();
+  alert(data.message || "Usuario eliminado");
+
+  if (res.ok) {
+    await loadUsers();
+  }
+}
+
+    async function createUser(event) {
+      event.preventDefault();
+
+      const createMsg = document.getElementById("createMsg");
+
+      const payload = {
+        username: document.getElementById("username").value.trim(),
+        password: document.getElementById("password").value.trim(),
+        role: document.getElementById("role").value,
+        start_date: document.getElementById("start_date").value || null,
+        end_date: document.getElementById("end_date").value || null,
+        status: document.getElementById("status").value
+      };
+
+      const res = await fetch("/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        createMsg.textContent = data.message || "No se pudo crear el usuario";
+        createMsg.style.color = "#ffbcc6";
+        return;
+      }
+
+      createMsg.textContent = data.message || "Usuario creado";
+      createMsg.style.color = "#9ff0b8";
+
+      document.getElementById("createUserForm").reset();
+      document.getElementById("role").value = "user";
+      document.getElementById("status").value = "activo";
+
+      await loadUsers();
+    }
+
+    async function loadLogs() {
+      const res = await fetch("/admin/logs");
+      const data = await res.json();
+      const box = document.getElementById("logsBox");
+
+      if (!res.ok || !data.ok) {
+        box.innerHTML = '<div class="empty-state">No se pudieron cargar los logs.</div>';
+        return;
+      }
+
+      const logs = data.logs || [];
+
+      if (!logs.length) {
+        box.innerHTML = '<div class="empty-state">No hay logs de acceso.</div>';
+        return;
+      }
+
+      box.innerHTML = logs.map(log => `
+        <div class="log-card">
+          <div class="log-top">
+            <div class="log-user">${escapeHtml(log.username || "Desconocido")}</div>
+            <div class="log-date">${escapeHtml(log.login_at || "-")}</div>
+          </div>
+          <div class="log-meta">
+            <div><strong>IP:</strong> ${escapeHtml(log.ip_address || "-")}</div>
+            <div><strong>Navegador:</strong> ${escapeHtml(log.user_agent || "-")}</div>
+            <div class="${log.success ? "log-ok" : "log-bad"}">
+              ${log.success ? "Ingreso correcto" : "Ingreso fallido"}
+            </div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function filterUsers() {
+      const term = document.getElementById("searchUser").value.trim().toLowerCase();
+
+      if (!term) {
+        renderUsers(allUsers);
+        return;
+      }
+
+      const filtered = allUsers.filter(user =>
+        String(user.username || "").toLowerCase().includes(term) ||
+        String(user.role || "").toLowerCase().includes(term) ||
+        String(user.status || "").toLowerCase().includes(term)
+      );
+
+      renderUsers(filtered);
+    }
+
+    document.getElementById("createUserForm").addEventListener("submit", createUser);
+    document.getElementById("loadLogsBtn").addEventListener("click", loadLogs);
+    document.getElementById("reloadAllBtn").addEventListener("click", async () => {
+      await loadUsers();
+      await loadLogs();
+    });
+    document.getElementById("searchUser").addEventListener("input", filterUsers);
+
+    (async function init() {
+      await checkAdminSession();
+      await loadUsers();
+      await loadLogs();
+    })();
+  </script>
+</body>
+</html>
