@@ -45,10 +45,11 @@
         radial-gradient(circle at 50% 100%, rgba(255, 77, 103, 0.10), transparent 25%),
         linear-gradient(180deg, #07111f 0%, #0b1730 50%, #09121f 100%);
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       padding: 24px;
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: hidden;
       position: relative;
     }
 
@@ -83,6 +84,7 @@
       max-width: 430px;
       position: relative;
       z-index: 1;
+      margin: 24px 0;
     }
 
     .login-card {
@@ -239,6 +241,63 @@
         font-size: 1.65rem;
       }
     }
+
+    .active-sessions-box {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .active-sessions-box h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+
+    .active-sessions-help {
+      margin: 0 0 12px;
+      color: #c8d7f0;
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+
+    #activeSessionsList {
+      max-height: 260px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .session-card {
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .session-card + .session-card {
+      margin-top: 10px;
+    }
+
+    .session-meta {
+      color: #c8d7f0;
+      font-size: 0.84rem;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+
+    .close-session-btn {
+      width: 100%;
+      min-height: 42px;
+      margin-top: 10px;
+      border: 0;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #ff5b73, #d90429);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
   </style>
 </head>
 <body>
