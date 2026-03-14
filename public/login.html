@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Acceso a Deportes Premium" />
   <title>Login - Deportes Premium</title>
+
+  <link rel="icon" href="data:," />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -29,12 +32,18 @@
       --success: #25d366;
       --shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
       --radius: 24px;
+      --transition: 0.18s ease;
     }
 
     html,
     body {
       min-height: 100%;
     }
+
+    /*html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }*/
 
     body {
       font-family: "Poppins", sans-serif;
@@ -61,6 +70,7 @@
       filter: blur(80px);
       z-index: 0;
       opacity: 0.55;
+      pointer-events: none;
     }
 
     body::before {
@@ -150,7 +160,7 @@
       background: rgba(255, 255, 255, 0.06);
       color: #fff;
       outline: none;
-      transition: 0.18s ease;
+      transition: var(--transition);
     }
 
     .field input::placeholder {
@@ -174,7 +184,7 @@
       font-size: 0.98rem;
       cursor: pointer;
       margin-top: 6px;
-      transition: 0.18s ease;
+      transition: var(--transition);
       box-shadow: 0 14px 30px rgba(0, 194, 255, 0.22);
     }
 
@@ -190,6 +200,7 @@
       min-height: 20px;
       color: #ffb8c2;
       font-size: 0.92rem;
+      line-height: 1.5;
     }
 
     .login-footer {
@@ -227,21 +238,6 @@
       vertical-align: middle;
     }
 
-    @media (max-width: 540px) {
-      body {
-        padding: 16px;
-      }
-
-      .login-card {
-        padding: 22px;
-        border-radius: 20px;
-      }
-
-      .brand h1 {
-        font-size: 1.65rem;
-      }
-    }
-
     .active-sessions-box {
       margin-top: 16px;
       padding: 14px 16px;
@@ -253,6 +249,7 @@
     .active-sessions-box h3 {
       margin: 0 0 8px;
       font-size: 1rem;
+      line-height: 1.4;
     }
 
     .active-sessions-help {
@@ -296,8 +293,36 @@
       color: white;
       font-weight: 700;
       cursor: pointer;
+      transition: var(--transition);
     }
 
+    .close-session-btn:hover,
+    .close-session-btn:focus {
+      transform: translateY(-1px);
+      filter: brightness(1.03);
+      outline: none;
+    }
+
+    .close-session-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    @media (max-width: 540px) {
+      body {
+        padding: 16px;
+      }
+
+      .login-card {
+        padding: 22px;
+        border-radius: 20px;
+      }
+
+      .brand h1 {
+        font-size: 1.65rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -311,7 +336,7 @@
 
         <h1>Deportes Premium</h1>
         <p>
-          Inicia sesión para acceder al reproductor y a la lista de canales streaming.
+          Inicia sesión para acceder al reproductor, a la lista de canales y a tu panel de streaming.
         </p>
       </div>
 
@@ -352,19 +377,18 @@
         </div>
       </form>
 
-      <!--<div class="demo-box">
+      <div class="demo-box">
         Demo de acceso:<br>
-        Usuario: <strong>admin</strong> / Contraseña: <strong>123456</strong><br>
-        Usuario: <strong>tv</strong> / Contraseña: <strong>iptv123</strong>
-      </div>-->
+        Usuario: <strong>admin</strong> / Contraseña: <strong>123456</strong>
+      </div>
 
       <div class="login-footer">
-        Bienvenidos a la diversion
+        Interfaz visual estilo IPTV moderna, pensada para escritorio, móvil y Android TV.
       </div>
     </div>
   </div>
 
- <script>
+  <script>
     fetch("/api/session")
       .then((res) => {
         if (res.ok) {
