@@ -1,192 +1,130 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Portal de streaming de Deportes Premium" />
+  <title>🎮 Deportes Premium</title>
 
-<meta charset="UTF-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<meta name="description" content="Portal de streaming de Deportes Premium">
-
-<title>🎮 Deportes Premium</title>
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
-
-<link rel="stylesheet" href="styles.css">
-
-<!--<a class="header-link" href="/admin.html">Administración</a>-->
-
+  <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
-
-<header>
-
-<div class="brand">
-<h1>Deportes Premium</h1>
-<p>Streaming deportivo en vivo</p>
-</div>
-
-<div class="header-actions">
-  <span class="header-badge" id="userBadge">Conectando...</span>
-
-  <a
-  class="header-link admin-link-hidden"
-  id="adminLink"
-  href="/admin.html"
->
-  Administración
-</a>
-
-  <a class="header-link" href="/logout">Cerrar sesión</a>
-</div>
-
-</header>
-
-
-<!--<div class="ticker">
-<span>
-🎉 Bienvenido a Deportes Premium |
-Usa pantalla completa para mejor experiencia
-</span>
-</div>-->
-
-<main>
-
-<aside class="sidebar" id="botonesIzquierda">
-
-<input
-type="text"
-id="searchInput"
-placeholder="🔍 Buscar canal..."
-autocomplete="off"
-/>
-
-<div id="categoriaContainer"></div>
-
-</aside>
-
-
-
-<section class="player-column">
-
-<div id="streamContainer">
-
- <div id="iptvBottomBar">
-  <div class="iptv-left">
-    <span class="iptv-live-dot"></span>
-    <div class="iptv-text-group">
-      <span id="iptvChannelName">Sin canal seleccionado</span>
-      <span id="iptvChannelCategory">Categoría</span>
+  <header>
+    <div class="brand">
+      <h1>Deportes Premium</h1>
+      <p>Streaming deportivo en vivo</p>
     </div>
-  </div>
 
-  <div class="iptv-center">
-    <span id="iptvStatus" class="iptv-badge">LISTO</span>
-  </div>
+    <div class="header-actions">
+      <span class="header-badge" id="userBadge">Conectando...</span>
 
-  <div class="iptv-right">
-    <span id="iptvClock">00:00</span>
-  </div>
-</div>
+      <a class="header-link" id="adminLink" href="/admin.html" hidden>
+        Administración
+      </a>
 
-<video
-id="streamVideo"
-controls
-autoplay
-muted
-preload="auto">
-</video>
-
-<div id="channelInfo">
-  <div class="channel-info-row">
-    <div>
-      <h3 id="currentChannelName" class="channel-info-title">Selecciona un canal</h3>
-      <p id="currentChannelCategory" class="channel-info-category">Categoría</p>
+      <a class="header-link" href="/logout">Cerrar sesión</a>
     </div>
-    <div class="channel-live-badge">🔴 EN VIVO</div>
-  </div>
-</div>
+  </header>
 
-<div class="top-buttons">
+  <main>
+    <aside class="sidebar" id="botonesIzquierda">
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="🔍 Buscar canal..."
+        autocomplete="off"
+      />
 
-<button id="volverBtn">⬅️ Volver</button>
+      <div id="categoriaContainer"></div>
+    </aside>
 
-<button id="fullscreenBtn">Pantalla completa</button>
+    <section class="player-column">
+      <div id="streamContainer">
+        <div id="iptvBottomBar">
+          <div class="iptv-left">
+            <span class="iptv-live-dot"></span>
+            <div class="iptv-text-group">
+              <span id="iptvChannelName">Sin canal seleccionado</span>
+              <span id="iptvChannelCategory">Categoría</span>
+            </div>
+          </div>
 
-<a
-id="infoBtn"
-href="https://www.espn.com.co/futbol/calendario"
-target="_blank"
-rel="noopener noreferrer"
->
-📰 Calendario de Fútbol
-</a>
+          <div class="iptv-center">
+            <span id="iptvStatus" class="iptv-badge">LISTO</span>
+          </div>
 
-<button id="soundBtn">🔊 Activar audio</button>
+          <div class="iptv-right">
+            <span id="iptvClock">00:00</span>
+          </div>
+        </div>
 
-</div>
+        <video
+          id="streamVideo"
+          controls
+          autoplay
+          muted
+          preload="auto">
+        </video>
 
-<div id="playerPanel">
+        <div id="channelInfo">
+          <div class="channel-info-row">
+            <div>
+              <h3 id="currentChannelName" class="channel-info-title">Selecciona un canal</h3>
+              <p id="currentChannelCategory" class="channel-info-category">Categoría</p>
+            </div>
+            <div class="channel-live-badge">🔴 EN VIVO</div>
+          </div>
+        </div>
 
-<h2 id="currentTitle">
-Deportes Premium
-</h2>
+        <div class="top-buttons">
+          <button id="volverBtn" type="button">⬅️ Volver</button>
+          <button id="fullscreenBtn" type="button">Pantalla completa</button>
 
-<div id="currentMeta">
-Elige un canal para comenzar la reproducción.
-</div>
+          <a
+            id="infoBtn"
+            href="https://www.espn.com.co/futbol/calendario"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            📰 Calendario de Fútbol
+          </a>
 
-<div class="status-row">
+          <button id="soundBtn" type="button">🔊 Activar audio</button>
+        </div>
 
-<span class="pill live" id="streamState">
-Sin reproducción
-</span>
+        <div id="playerPanel">
+          <h2 id="currentTitle">Deportes Premium</h2>
 
-<span class="pill" id="streamType">
-Sin tipo detectado
-</span>
+          <div id="currentMeta">
+            Elige un canal para comenzar la reproducción.
+          </div>
 
-</div>
+          <div class="status-row">
+            <span class="pill live" id="streamState">Sin reproducción</span>
+            <span class="pill" id="streamType">Sin tipo detectado</span>
+          </div>
+        </div>
 
-</div>
+        <div class="info-card">
+          <div class="helper">
+            Esta versión usa archivos separados para HTML, CSS y JavaScript.
+            Puedes editar la constante
+            <strong>CHANNELS</strong> en <strong>app.js</strong>.
+          </div>
+        </div>
+      </div>
+    </section>
 
+    <aside class="sidebar" id="botonesDerecha">
+      <div id="categoriaContainerDerecha"></div>
+    </aside>
+  </main>
 
-<div class="info-card">
-
-<div class="helper">
-
-Esta versión usa archivos separados para HTML, CSS y JavaScript.
-
-Puedes editar la constante  
-<strong>CHANNELS</strong> en <strong>app.js</strong>.
-
-</div>
-
-</div>
-
-</section>
-
-
-
-<aside class="sidebar" id="botonesDerecha">
-
-<div id="categoriaContainerDerecha"></div>
-
-</aside>
-
-
-</main>
-
-
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-
-<script src="app.js"></script>
-
-
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="app.js"></script>
 </body>
 </html>

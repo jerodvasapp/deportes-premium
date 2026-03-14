@@ -515,7 +515,15 @@ app.post("/login", loginRateLimit, (req, res) => {
           if (sessions.length >= 2) {
             return res.status(403).json({
               ok: false,
-              message: "Máximo 2 conexiones activas permitidas para este usuario"
+              code: "MAX_SESSIONS",
+              message: "Máximo 2 conexiones activas permitidas para este usuario",
+              sessions: sessions.map((s) => ({
+                session_id: s.session_id,
+                ip_address: s.ip_address,
+                user_agent: s.user_agent,
+                created_at: s.created_at,
+                last_seen: s.last_seen
+              }))
             });
           }
 
@@ -558,6 +566,67 @@ app.get("/api/session", (req, res) => {
     loggedIn: true,
     user: req.session.user
   });
+});
+
+app.post("/api/close-session", async (req, res) => {
+  try {
+    const { username, password, sessionId } = req.body;
+
+    if (!username || !password || !sessionId) {
+      return res.status(400).json({
+        ok: false,
+        message: "Faltan datos para cerrar la sesión"
+      });
+    }
+
+    db.get("SELECT * FROM users WHERE username = ?", [username], async (err, user) => {
+      if (err) {
+        return res.status(500).json({ ok: false, message: "Error del servidor" });
+      }
+
+      if (!user) {
+        return res.status(401).json({ ok: false, message: "Usuario no encontrado" });
+      }
+
+      const passwordOk = await bcrypt.compare(password, user.password_hash);
+
+      if (!passwordOk) {
+        return res.status(401).json({ ok: false, message: "Contraseña incorrecta" });
+      }
+
+      db.get(
+        "SELECT * FROM user_sessions WHERE session_id = ? AND user_id = ?",
+        [sessionId, user.id],
+        (sessionErr, sessionRow) => {
+          if (sessionErr) {
+            return res.status(500).json({ ok: false, message: "Error buscando la sesión" });
+          }
+
+          if (!sessionRow) {
+            return res.status(404).json({ ok: false, message: "Sesión no encontrada" });
+          }
+
+          db.run(
+            "DELETE FROM user_sessions WHERE session_id = ?",
+            [sessionId],
+            function (deleteErr) {
+              if (deleteErr) {
+                return res.status(500).json({ ok: false, message: "No se pudo cerrar la sesión" });
+              }
+
+              return res.json({
+                ok: true,
+                message: "Sesión cerrada correctamente"
+              });
+            }
+          );
+        }
+      );
+    });
+  } catch (error) {
+    console.error("Error en /api/close-session:", error);
+    return res.status(500).json({ ok: false, message: "Error cerrando la sesión" });
+  }
 });
 
 // =========================

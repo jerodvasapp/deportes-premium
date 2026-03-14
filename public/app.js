@@ -1,19 +1,36 @@
 
-//
 const userBadge = document.getElementById("userBadge");
 const adminLink = document.getElementById("adminLink");
 
 async function checkSession() {
-  const res = await fetch("/api/session");
-  const data = await res.json();
+  try {
+    const response = await fetch("/api/session");
 
-  if (!data.loggedIn) {
+    if (!response.ok) {
+      window.location.href = "/login.html";
+      return;
+    }
+
+    const data = await response.json();
+
+    if (!data.loggedIn) {
+      window.location.href = "/login.html";
+      return;
+    }
+
+    if (userBadge) {
+      userBadge.textContent = "Usuario: " + data.user.username;
+    }
+
+    if (adminLink) {
+      if (data.user && data.user.role === "admin") {
+        adminLink.hidden = false;
+      } else {
+        adminLink.hidden = true;
+      }
+    }
+  } catch (error) {
     window.location.href = "/login.html";
-    return;
-  }
-
-  if (data.user && data.user.role === "admin") {
-    adminLink.classList.remove("admin-link-hidden");
   }
 }
 
@@ -37,7 +54,6 @@ function proxifyChannelUrl(url, type) {
 }
 
 const CHANNELS = [
-  
   { name: "ESPN 1", category: "deportes espn", url: "http://167.17.67.240:8888/Espn1/tracks-v1a1/mono.m3u8", type: "hls" },
   { name: "ESPN 2", category: "deportes espn", url: "http://167.17.67.240:8888/Espn2/tracks-v1a1/mono.m3u8", type: "hls" },
   { name: "ESPN 3", category: "deportes espn", url: "http://167.17.67.240:8888/Espn3/tracks-v1a1/mono.m3u8", type: "hls" },
@@ -51,6 +67,11 @@ const CHANNELS = [
   { name: "Dsports+", category: "Dgo", url: "http://167.17.67.240:8888/DSPORTS/tracks-v1a1/mono.m3u8", type: "hls" },
   { name: "Dsports2", category: "Dgo", url: "http://167.17.67.240:8888/dsport2colombia/tracks-v1a1/mono.m3u8", type: "hls" }
 ];
+
+const CHANNELS_PROXIED = CHANNELS.map((channel) => ({
+  ...channel,
+  url: proxifyChannelUrl(channel.url, channel.type)
+}));
 
 const CHANNEL_COLORS = [
   { match: "espn", color: "linear-gradient(135deg, #d90429, #ff4d6d)" },
@@ -77,11 +98,6 @@ const CHANNEL_LOGOS = [
   { match: "bein", file: "img/bein-sports.png", alt: "beIN Sports" },
   { match: "sky", file: "img/sky-sports.png", alt: "Sky Sports" }
 ];
-
-const CHANNELS_PROXIED = CHANNELS.map((channel) => ({
-  ...channel,
-  url: proxifyChannelUrl(channel.url, channel.type)
-}));
 
 let currentHls = null;
 let userInteracted = false;
@@ -250,11 +266,17 @@ function loadStream(channel) {
       currentHls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
-        backBufferLength: 30,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 5
+        backBufferLength: 90,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 120,
+        liveSyncDurationCount: 4,
+        liveMaxLatencyDurationCount: 8,
+        fragLoadingTimeOut: 20000,
+        manifestLoadingTimeOut: 15000,
+        levelLoadingTimeOut: 15000,
+        fragLoadingRetryDelay: 1000,
+        manifestLoadingRetryDelay: 1000,
+        levelLoadingRetryDelay: 1000
       });
 
       currentHls.loadSource(channel.url);
@@ -274,6 +296,7 @@ function loadStream(channel) {
 
         hideLoadingIndicator();
         streamState.textContent = "Error de reproducción";
+        setIptvStatus("ERROR", "iptv-status-error");
 
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
@@ -370,18 +393,18 @@ function renderGroupedChannels(channels) {
     content.className = "canales";
 
     const toggle = () => {
-  const allContents = document.querySelectorAll(".canales");
-  const allHeaders = document.querySelectorAll(".categoria h3");
-  const willOpen = !content.classList.contains("show");
+      const allContents = document.querySelectorAll(".canales");
+      const allHeaders = document.querySelectorAll(".categoria h3");
+      const willOpen = !content.classList.contains("show");
 
-  allContents.forEach((item) => item.classList.remove("show"));
-  allHeaders.forEach((item) => item.setAttribute("aria-expanded", "false"));
+      allContents.forEach((item) => item.classList.remove("show"));
+      allHeaders.forEach((item) => item.setAttribute("aria-expanded", "false"));
 
-  if (willOpen) {
-    content.classList.add("show");
-    header.setAttribute("aria-expanded", "true");
-  }
-};
+      if (willOpen) {
+        content.classList.add("show");
+        header.setAttribute("aria-expanded", "true");
+      }
+    };
 
     header.addEventListener("click", toggle);
     header.addEventListener("keydown", (event) => {
@@ -426,8 +449,11 @@ function renderGroupedChannels(channels) {
     section.appendChild(header);
     section.appendChild(content);
 
-    
+    if (index < midpoint) {
       leftContainer.appendChild(section);
+    } else {
+      rightContainer.appendChild(section);
+    }
   });
 }
 
@@ -438,7 +464,7 @@ searchInput.addEventListener("input", (event) => {
     const term = event.target.value.trim().toLowerCase();
 
     if (!term) {
-      renderGroupedChannels(CHANNELS);
+      renderGroupedChannels(CHANNELS_PROXIED);
       return;
     }
 
@@ -567,8 +593,6 @@ window.addEventListener("load", () => {
   if (first) first.focus();
 });
 
-renderGroupedChannels(CHANNELS_PROXIED);
-
 const iptvChannelName = document.getElementById("iptvChannelName");
 const iptvChannelCategory = document.getElementById("iptvChannelCategory");
 const iptvStatus = document.getElementById("iptvStatus");
@@ -612,3 +636,5 @@ document.addEventListener("mousemove", handleIptvBarInteraction);
 document.addEventListener("keydown", handleIptvBarInteraction);
 document.addEventListener("touchstart", handleIptvBarInteraction);
 document.addEventListener("click", handleIptvBarInteraction);
+
+renderGroupedChannels(CHANNELS_PROXIED);
