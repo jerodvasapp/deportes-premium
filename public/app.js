@@ -19,23 +19,27 @@ async function checkSession() {
 
 checkSession();
 
+function proxifyChannelUrl(url, type) {
+  if (!url || typeof url !== "string") return url;
+
+  const isHttp = url.startsWith("http://");
+  const isHls = type === "hls" || url.toLowerCase().includes(".m3u8");
+
+  if (isHttp && isHls) {
+    return "/proxy/hls?url=" + encodeURIComponent(url);
+  }
+
+  if (isHttp) {
+    return "/proxy/file?url=" + encodeURIComponent(url);
+  }
+
+  return url;
+}
+
 const CHANNELS = [
-  {
-  name: "ESPN 1",
-  category: "deportes espn",
-  url: "/proxy/hls?url=" + encodeURIComponent("http://167.17.67.240:8888/Espn1/tracks-v1a1/mono.m3u8"),
-  type: "hls"
-},
-  {
-  name: "ESPN 2",
-  category: "deportes espn",
-  url: "/proxy/hls?url=" + encodeURIComponent("http://167.17.67.240:8888/Espn2/tracks-v1a1/mono.m3u8"),
-  type: "hls"
-},
-
-
-  /*{ name: "ESPN 1", category: "deportes espn", url: "http://167.17.67.240:8888/Espn1/tracks-v1a1/mono.m3u8", type: "hls" },*/
- /* { name: "ESPN 2", category: "deportes espn", url: "http://167.17.67.240:8888/Espn2/tracks-v1a1/mono.m3u8", type: "hls" },*/
+  
+  { name: "ESPN 1", category: "deportes espn", url: "http://167.17.67.240:8888/Espn1/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "ESPN 2", category: "deportes espn", url: "http://167.17.67.240:8888/Espn2/tracks-v1a1/mono.m3u8", type: "hls" },
   { name: "ESPN 3", category: "deportes espn", url: "http://167.17.67.240:8888/Espn3/tracks-v1a1/mono.m3u8", type: "hls" },
   { name: "ESPN 4", category: "deportes espn", url: "http://167.17.67.240:8888/Espn4/tracks-v1a1/mono.m3u8", type: "hls" },
   { name: "ESPN 5", category: "deportes espn", url: "http://167.17.67.240:8888/Espn5/tracks-v1a1/mono.m3u8", type: "hls" },
@@ -73,6 +77,11 @@ const CHANNEL_LOGOS = [
   { match: "bein", file: "img/bein-sports.png", alt: "beIN Sports" },
   { match: "sky", file: "img/sky-sports.png", alt: "Sky Sports" }
 ];
+
+const CHANNELS_PROXIED = CHANNELS.map((channel) => ({
+  ...channel,
+  url: proxifyChannelUrl(channel.url, channel.type)
+}));
 
 let currentHls = null;
 let userInteracted = false;
@@ -433,7 +442,7 @@ searchInput.addEventListener("input", (event) => {
       return;
     }
 
-    const filtered = CHANNELS.filter((channel) => {
+    const filtered = CHANNELS_PROXIED.filter((channel) => {
       return (
         channel.name.toLowerCase().includes(term) ||
         channel.category.toLowerCase().includes(term)
@@ -558,7 +567,7 @@ window.addEventListener("load", () => {
   if (first) first.focus();
 });
 
-renderGroupedChannels(CHANNELS);
+renderGroupedChannels(CHANNELS_PROXIED);
 
 const iptvChannelName = document.getElementById("iptvChannelName");
 const iptvChannelCategory = document.getElementById("iptvChannelCategory");

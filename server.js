@@ -1,4 +1,4 @@
-//Crear la base de datos de usuarios
+// Crear la base de datos de usuarios
 
 const express = require("express");
 const session = require("express-session");
@@ -14,36 +14,15 @@ const DB_PATH = process.env.DB_PATH || "./database.db";
 
 const db = new sqlite3.Database(DB_PATH);
 
+// =========================
+// Configuración general
+// =========================
+
 app.use(
   helmet({
     contentSecurityPolicy: false
   })
 );
-app.use(express.static(path.join(__dirname, "public")));
-app.get("/login.html", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "login.html"));
-});
-
-app.get("/logout", (req, res) => {
-  req.session.destroy(() => {
-    res.redirect("/login.html");
-  });
-});
-
-app.get("/", (req, res) => {
-  if (req.session.user) {
-    return res.redirect("/index.html");
-  }
-  return res.redirect("/login.html");
-});
-
-app.get("/index.html", requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-app.get("/admin.html", requireAdmin, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "admin.html"));
-});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -63,6 +42,32 @@ app.use(
     }
   })
 );
+
+// Evitar caché en login y admin
+app.use((req, res, next) => {
+  if (req.path === "/login.html" || req.path === "/admin.html") {
+    res.setHeader("Cache-Control", "no-store");
+  }
+  next();
+});
+
+// Actualizar actividad de sesión si existe
+app.use((req, res, next) => {
+  if (req.session && req.session.user && req.sessionID) {
+    db.run(
+      "UPDATE user_sessions SET last_seen = CURRENT_TIMESTAMP WHERE session_id = ?",
+      [req.sessionID],
+      () => {}
+    );
+  }
+  next();
+});
+
+app.use(express.static(path.join(__dirname, "public")));
+
+// =========================
+// Base de datos
+// =========================
 
 db.serialize(() => {
   db.run(`
@@ -89,9 +94,100 @@ db.serialize(() => {
       success INTEGER DEFAULT 1
     )
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      username TEXT NOT NULL,
+      session_id TEXT NOT NULL UNIQUE,
+      ip_address TEXT,
+      user_agent TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      last_seen TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 });
 
-//Crear el usuario administrador inicial
+// =========================
+// Helpers
+// =========================
+
+function cleanupUserSessions() {
+  db.run(`
+    DELETE FROM user_sessions
+    WHERE datetime(last_seen) < datetime('now', '-2 hours')
+  `);
+}
+
+function isUserExpired(user) {
+  if (!user.end_date) return false;
+
+  const today = new Date();
+  const endDate = new Date(user.end_date + "T23:59:59");
+
+  return today > endDate;
+}
+
+function isUserNotStarted(user) {
+  if (!user.start_date) return false;
+
+  const today = new Date();
+  const startDate = new Date(user.start_date + "T00:00:00");
+
+  return today < startDate;
+}
+
+function requireAuth(req, res, next) {
+  if (!req.session || !req.session.user) {
+    return res.redirect("/login.html");
+  }
+  next();
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.session || !req.session.user || req.session.user.role !== "admin") {
+    return res.status(403).json({ ok: false, message: "Acceso denegado" });
+  }
+  next();
+}
+
+// =========================
+// Rate limit básico login
+// =========================
+
+const loginAttempts = new Map();
+
+function loginRateLimit(req, res, next) {
+  const ip = req.ip;
+  const now = Date.now();
+  const windowMs = 10 * 60 * 1000;
+  const maxAttempts = 10;
+
+  const entry = loginAttempts.get(ip) || { count: 0, first: now };
+
+  if (now - entry.first > windowMs) {
+    entry.count = 0;
+    entry.first = now;
+  }
+
+  entry.count += 1;
+  loginAttempts.set(ip, entry);
+
+  if (entry.count > maxAttempts) {
+    return res.status(429).json({
+      ok: false,
+      message: "Demasiados intentos. Intenta más tarde."
+    });
+  }
+
+  next();
+}
+
+// =========================
+// Crear admin por defecto
+// =========================
+
 async function createDefaultAdmin() {
   const username = "admin";
   const password = "123456";
@@ -130,225 +226,31 @@ async function createDefaultAdmin() {
 
 createDefaultAdmin();
 
-//Validar login con fecha inicial y fecha final
-function isUserExpired(user) {
-  if (!user.end_date) return false;
+// =========================
+// Proxy HLS / archivos
+// =========================
 
-  const today = new Date();
-  const endDate = new Date(user.end_date + "T23:59:59");
+const playlistCache = new Map();
+const PLAYLIST_CACHE_MS = 3000;
 
-  return today > endDate;
+function getCachedPlaylist(url) {
+  const entry = playlistCache.get(url);
+  if (!entry) return null;
+
+  if (Date.now() - entry.timestamp > PLAYLIST_CACHE_MS) {
+    playlistCache.delete(url);
+    return null;
+  }
+
+  return entry.data;
 }
 
-function isUserNotStarted(user) {
-  if (!user.start_date) return false;
-
-  const today = new Date();
-  const startDate = new Date(user.start_date + "T00:00:00");
-
-  return today < startDate;
-}
-
-app.post("/login", (req, res) => {
-  const { username, password } = req.body;
-
-  db.get("SELECT * FROM users WHERE username = ?", [username], async (err, user) => {
-    if (err) {
-      return res.status(500).json({ ok: false, message: "Error del servidor" });
-    }
-
-    if (!user) {
-      return res.status(401).json({ ok: false, message: "Usuario o contraseña incorrectos" });
-    }
-
-    const passwordOk = await bcrypt.compare(password, user.password_hash);
-
-    if (!passwordOk) {
-      db.run(
-        `INSERT INTO access_logs (user_id, username, ip_address, user_agent, success)
-         VALUES (?, ?, ?, ?, ?)`,
-        [user.id, user.username, req.ip, req.get("user-agent"), 0]
-      );
-
-      return res.status(401).json({ ok: false, message: "Usuario o contraseña incorrectos" });
-    }
-
-    if (user.status !== "activo") {
-      return res.status(403).json({ ok: false, message: "Usuario suspendido" });
-    }
-
-    if (isUserNotStarted(user)) {
-      return res.status(403).json({ ok: false, message: "Tu acceso aún no ha iniciado" });
-    }
-
-    if (isUserExpired(user)) {
-      return res.status(403).json({ ok: false, message: "Tu acceso ha vencido" });
-    }
-
-    req.session.user = {
-      id: user.id,
-      username: user.username,
-      role: user.role
-    };
-
-    db.run(
-      `INSERT INTO access_logs (user_id, username, ip_address, user_agent, success)
-       VALUES (?, ?, ?, ?, ?)`,
-      [user.id, user.username, req.ip, req.get("user-agent"), 1]
-    );
-
-    return res.json({ ok: true, message: "Login correcto" });
+function setCachedPlaylist(url, data) {
+  playlistCache.set(url, {
+    data,
+    timestamp: Date.now()
   });
-});
-
-//Crear validación de sesión
-function requireAuth(req, res, next) {
-  if (!req.session.user) {
-    return res.redirect("/login.html");
-  }
-  next();
 }
-
-function requireAdmin(req, res, next) {
-  if (!req.session.user || req.session.user.role !== "admin") {
-    return res.status(403).json({ ok: false, message: "Acceso denegado" });
-  }
-  next();
-}
-
-app.get("/api/session", (req, res) => {
-  if (!req.session.user) {
-    return res.status(401).json({ loggedIn: false });
-  }
-
-  return res.json({
-    loggedIn: true,
-    user: req.session.user
-  });
-});
-
-//Crear rutas para administrar usuarios - listar usuarios
-app.get("/admin/users", requireAdmin, (req, res) => {
-  db.all(
-    `SELECT id, username, role, start_date, end_date, status, created_at
-     FROM users
-     ORDER BY id DESC`,
-    [],
-    (err, rows) => {
-      if (err) {
-        return res.status(500).json({ ok: false, message: "Error al listar usuarios" });
-      }
-
-      res.json({ ok: true, users: rows });
-    }
-  );
-});
-
-//Crear rutas para administrar usuarios - crear usuario
-app.post("/admin/users", requireAdmin, async (req, res) => {
-  const { username, password, role, start_date, end_date, status } = req.body;
-
-  if (!username || !password) {
-    return res.status(400).json({ ok: false, message: "Usuario y contraseña son obligatorios" });
-  }
-
-  const hash = await bcrypt.hash(password, 10);
-
-  db.run(
-    `INSERT INTO users (username, password_hash, role, start_date, end_date, status)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [
-      username,
-      hash,
-      role || "user",
-      start_date || null,
-      end_date || null,
-      status || "activo"
-    ],
-    function (err) {
-      if (err) {
-        return res.status(500).json({ ok: false, message: "No se pudo crear el usuario" });
-      }
-
-      res.json({ ok: true, id: this.lastID, message: "Usuario creado" });
-    }
-  );
-});
-
-//Crear rutas para administrar usuarios - editar usuario
-app.put("/admin/users/:id", requireAdmin, (req, res) => {
-  const { id } = req.params;
-  const { role, start_date, end_date, status } = req.body;
-
-  db.run(
-    `UPDATE users
-     SET role = ?, start_date = ?, end_date = ?, status = ?
-     WHERE id = ?`,
-    [role, start_date, end_date, status, id],
-    function (err) {
-      if (err) {
-        return res.status(500).json({ ok: false, message: "No se pudo actualizar el usuario" });
-      }
-
-      res.json({ ok: true, message: "Usuario actualizado" });
-    }
-  );
-});
-
-//Crear rutas para administrar usuarios - cambiar contraseña
-app.put("/admin/users/:id/password", requireAdmin, async (req, res) => {
-  const { id } = req.params;
-  const { password } = req.body;
-
-  if (!password) {
-    return res.status(400).json({ ok: false, message: "La contraseña es obligatoria" });
-  }
-
-  const hash = await bcrypt.hash(password, 10);
-
-  db.run(
-    `UPDATE users SET password_hash = ? WHERE id = ?`,
-    [hash, id],
-    function (err) {
-      if (err) {
-        return res.status(500).json({ ok: false, message: "No se pudo cambiar la contraseña" });
-      }
-
-      res.json({ ok: true, message: "Contraseña actualizada" });
-    }
-  );
-});
-
-//Crear rutas para administrar usuarios - eliminar usuario
-app.delete("/admin/users/:id", requireAdmin, (req, res) => {
-  const { id } = req.params;
-
-  db.run(`DELETE FROM users WHERE id = ?`, [id], function (err) {
-    if (err) {
-      return res.status(500).json({ ok: false, message: "No se pudo eliminar el usuario" });
-    }
-
-    res.json({ ok: true, message: "Usuario eliminado" });
-  });
-});
-
-//Crear rutas para administrar usuarios - ver logs de acceso
-app.get("/admin/logs", requireAdmin, (req, res) => {
-  db.all(
-    `SELECT id, user_id, username, login_at, ip_address, user_agent, success
-     FROM access_logs
-     ORDER BY id DESC
-     LIMIT 200`,
-    [],
-    (err, rows) => {
-      if (err) {
-        return res.status(500).json({ ok: false, message: "Error al obtener logs" });
-      }
-
-      res.json({ ok: true, logs: rows });
-    }
-  );
-});
 
 function isAllowedStreamHost(urlString) {
   try {
@@ -397,11 +299,19 @@ app.get("/proxy/hls", async (req, res) => {
       return res.status(403).send("Host no permitido");
     }
 
+    const cached = getCachedPlaylist(targetUrl);
+    if (cached) {
+      res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+      res.setHeader("Cache-Control", "no-store");
+      return res.send(cached);
+    }
+
     const upstream = await fetch(targetUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0",
         "Accept": "application/vnd.apple.mpegurl, application/x-mpegURL, */*"
-      }
+      },
+      signal: AbortSignal.timeout(10000)
     });
 
     if (!upstream.ok) {
@@ -410,6 +320,8 @@ app.get("/proxy/hls", async (req, res) => {
 
     const originalText = await upstream.text();
     const proxiedText = rewriteM3U8(originalText, targetUrl);
+
+    setCachedPlaylist(targetUrl, proxiedText);
 
     res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
     res.setHeader("Cache-Control", "no-store");
@@ -441,7 +353,10 @@ app.get("/proxy/segment", async (req, res) => {
       headers.Range = req.headers.range;
     }
 
-    const upstream = await fetch(targetUrl, { headers });
+    const upstream = await fetch(targetUrl, {
+      headers,
+      signal: AbortSignal.timeout(15000)
+    });
 
     if (!upstream.ok) {
       return res.status(upstream.status).send(`Error cargando segmento: ${upstream.status}`);
@@ -451,14 +366,13 @@ app.get("/proxy/segment", async (req, res) => {
     const contentLength = upstream.headers.get("content-length");
     const acceptRanges = upstream.headers.get("accept-ranges");
     const contentRange = upstream.headers.get("content-range");
-    const cacheControl = upstream.headers.get("cache-control");
 
     if (contentType) res.setHeader("Content-Type", contentType);
     if (contentLength) res.setHeader("Content-Length", contentLength);
     if (acceptRanges) res.setHeader("Accept-Ranges", acceptRanges);
     if (contentRange) res.setHeader("Content-Range", contentRange);
-    if (cacheControl) res.setHeader("Cache-Control", cacheControl);
 
+    res.setHeader("Cache-Control", "public, max-age=10");
     res.status(upstream.status);
 
     if (!upstream.body) {
@@ -472,14 +386,351 @@ app.get("/proxy/segment", async (req, res) => {
   }
 });
 
+app.get("/proxy/file", async (req, res) => {
+  try {
+    const targetUrl = req.query.url;
 
-//finalizar servidor
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    if (!targetUrl || typeof targetUrl !== "string") {
+      return res.status(400).send("Falta la URL");
+    }
+
+    if (!isAllowedStreamHost(targetUrl)) {
+      return res.status(403).send("Host no permitido");
+    }
+
+    const upstream = await fetch(targetUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "*/*"
+      },
+      signal: AbortSignal.timeout(15000)
+    });
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).send(`Error cargando archivo: ${upstream.status}`);
+    }
+
+    const contentType = upstream.headers.get("content-type");
+    if (contentType) res.setHeader("Content-Type", contentType);
+
+    if (!upstream.body) {
+      return res.end();
+    }
+
+    Readable.fromWeb(upstream.body).pipe(res);
+  } catch (error) {
+    console.error("Error en /proxy/file:", error);
+    return res.status(500).send("Error cargando archivo");
+  }
 });
+
+// =========================
+// Rutas básicas
+// =========================
+
+app.get("/login.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "login.html"));
+});
+
+app.get("/logout", (req, res) => {
+  if (req.session) {
+    const sid = req.sessionID;
+
+    db.run("DELETE FROM user_sessions WHERE session_id = ?", [sid], () => {
+      req.session.destroy(() => {
+        res.redirect("/login.html");
+      });
+    });
+  } else {
+    res.redirect("/login.html");
+  }
+});
+
+app.get("/", (req, res) => {
+  if (req.session && req.session.user) {
+    return res.redirect("/index.html");
+  }
+  return res.redirect("/login.html");
+});
+
+app.get("/index.html", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+app.get("/admin.html", requireAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
+// =========================
+// Login / sesión
+// =========================
+
+app.post("/login", loginRateLimit, (req, res) => {
+  const { username, password } = req.body;
+
+  db.get("SELECT * FROM users WHERE username = ?", [username], async (err, user) => {
+    if (err) {
+      return res.status(500).json({ ok: false, message: "Error del servidor" });
+    }
+
+    if (!user) {
+      return res.status(401).json({ ok: false, message: "Usuario o contraseña incorrectos" });
+    }
+
+    const passwordOk = await bcrypt.compare(password, user.password_hash);
+
+    if (!passwordOk) {
+      db.run(
+        `INSERT INTO access_logs (user_id, username, ip_address, user_agent, success)
+         VALUES (?, ?, ?, ?, ?)`,
+        [user.id, user.username, req.ip, req.get("user-agent"), 0]
+      );
+
+      return res.status(401).json({ ok: false, message: "Usuario o contraseña incorrectos" });
+    }
+
+    if (user.status !== "activo") {
+      return res.status(403).json({ ok: false, message: "Usuario suspendido" });
+    }
+
+    if (isUserNotStarted(user)) {
+      return res.status(403).json({ ok: false, message: "Tu acceso aún no ha iniciado" });
+    }
+
+    if (isUserExpired(user)) {
+      return res.status(403).json({ ok: false, message: "Tu acceso ha vencido" });
+    }
+
+    cleanupUserSessions();
+
+    db.run("DELETE FROM user_sessions WHERE session_id = ?", [req.sessionID], () => {
+      db.all(
+        "SELECT * FROM user_sessions WHERE user_id = ?",
+        [user.id],
+        (sessionErr, sessions) => {
+          if (sessionErr) {
+            return res.status(500).json({ ok: false, message: "Error validando sesiones activas" });
+          }
+
+          if (sessions.length >= 2) {
+            return res.status(403).json({
+              ok: false,
+              message: "Máximo 2 conexiones activas permitidas para este usuario"
+            });
+          }
+
+          req.session.user = {
+            id: user.id,
+            username: user.username,
+            role: user.role
+          };
+
+          db.run(
+            `INSERT INTO access_logs (user_id, username, ip_address, user_agent, success)
+             VALUES (?, ?, ?, ?, ?)`,
+            [user.id, user.username, req.ip, req.get("user-agent"), 1]
+          );
+
+          db.run(
+            `INSERT INTO user_sessions (user_id, username, session_id, ip_address, user_agent)
+             VALUES (?, ?, ?, ?, ?)`,
+            [user.id, user.username, req.sessionID, req.ip, req.get("user-agent")],
+            (insertErr) => {
+              if (insertErr) {
+                console.error("Error guardando sesión activa:", insertErr);
+              }
+
+              return res.json({ ok: true, message: "Login correcto" });
+            }
+          );
+        }
+      );
+    });
+  });
+});
+
+app.get("/api/session", (req, res) => {
+  if (!req.session || !req.session.user) {
+    return res.status(401).json({ loggedIn: false });
+  }
+
+  return res.json({
+    loggedIn: true,
+    user: req.session.user
+  });
+});
+
+// =========================
+// Admin - usuarios
+// =========================
+
+app.get("/admin/users", requireAdmin, (req, res) => {
+  db.all(
+    `SELECT id, username, role, start_date, end_date, status, created_at
+     FROM users
+     ORDER BY id DESC`,
+    [],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ ok: false, message: "Error al listar usuarios" });
+      }
+
+      res.json({ ok: true, users: rows });
+    }
+  );
+});
+
+app.post("/admin/users", requireAdmin, async (req, res) => {
+  const { username, password, role, start_date, end_date, status } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ ok: false, message: "Usuario y contraseña son obligatorios" });
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+
+  db.run(
+    `INSERT INTO users (username, password_hash, role, start_date, end_date, status)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      username,
+      hash,
+      role || "user",
+      start_date || null,
+      end_date || null,
+      status || "activo"
+    ],
+    function (err) {
+      if (err) {
+        return res.status(500).json({ ok: false, message: "No se pudo crear el usuario" });
+      }
+
+      res.json({ ok: true, id: this.lastID, message: "Usuario creado" });
+    }
+  );
+});
+
+app.put("/admin/users/:id", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { role, start_date, end_date, status } = req.body;
+
+  const currentUser = req.session.user;
+
+  if (Number(id) === Number(currentUser.id)) {
+    return res.status(400).json({
+      ok: false,
+      message: "No puedes cambiar tu propio rol o estado desde esta pantalla"
+    });
+  }
+
+  db.run(
+    `UPDATE users
+     SET role = ?, start_date = ?, end_date = ?, status = ?
+     WHERE id = ?`,
+    [role, start_date, end_date, status, id],
+    function (err) {
+      if (err) {
+        return res.status(500).json({ ok: false, message: "No se pudo actualizar el usuario" });
+      }
+
+      res.json({ ok: true, message: "Usuario actualizado" });
+    }
+  );
+});
+
+app.put("/admin/users/:id/password", requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({ ok: false, message: "La contraseña es obligatoria" });
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+
+  db.run(
+    `UPDATE users SET password_hash = ? WHERE id = ?`,
+    [hash, id],
+    function (err) {
+      if (err) {
+        return res.status(500).json({ ok: false, message: "No se pudo cambiar la contraseña" });
+      }
+
+      res.json({ ok: true, message: "Contraseña actualizada" });
+    }
+  );
+});
+
+app.delete("/admin/users/:id", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const currentUser = req.session.user;
+
+  if (Number(id) === Number(currentUser.id)) {
+    return res.status(400).json({
+      ok: false,
+      message: "No puedes eliminar tu propia cuenta"
+    });
+  }
+
+  db.run(`DELETE FROM users WHERE id = ?`, [id], function (err) {
+    if (err) {
+      return res.status(500).json({ ok: false, message: "No se pudo eliminar el usuario" });
+    }
+
+    db.run(`DELETE FROM user_sessions WHERE user_id = ?`, [id], () => {
+      res.json({ ok: true, message: "Usuario eliminado" });
+    });
+  });
+});
+
+app.get("/admin/logs", requireAdmin, (req, res) => {
+  db.all(
+    `SELECT id, user_id, username, login_at, ip_address, user_agent, success
+     FROM access_logs
+     ORDER BY id DESC
+     LIMIT 200`,
+    [],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ ok: false, message: "Error al obtener logs" });
+      }
+
+      res.json({ ok: true, logs: rows });
+    }
+  );
+});
+
+app.get("/admin/active-sessions", requireAdmin, (req, res) => {
+  cleanupUserSessions();
+
+  db.all(
+    `SELECT id, user_id, username, session_id, ip_address, user_agent, created_at, last_seen
+     FROM user_sessions
+     ORDER BY last_seen DESC`,
+    [],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ ok: false, message: "Error al obtener sesiones activas" });
+      }
+
+      res.json({ ok: true, sessions: rows });
+    }
+  );
+});
+
+// =========================
+// Error handler
+// =========================
 
 app.use((err, req, res, next) => {
   console.error("ERROR NO CONTROLADO:", err);
   res.status(500).send("Internal Server Error");
 });
 
+// =========================
+// Servidor
+// =========================
+
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+});
