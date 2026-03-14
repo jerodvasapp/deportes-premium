@@ -444,7 +444,8 @@ main {
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
-}
+  display: none !important;
+  }
 
 #currentTitle {
   margin: 0;

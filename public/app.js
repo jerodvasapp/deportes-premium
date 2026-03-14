@@ -23,11 +23,7 @@ async function checkSession() {
     }
 
     if (adminLink) {
-      if (data.user && data.user.role === "admin") {
-        adminLink.hidden = false;
-      } else {
-        adminLink.hidden = true;
-      }
+      adminLink.hidden = !(data.user && data.user.role === "admin");
     }
   } catch (error) {
     window.location.href = "/login.html";
@@ -103,44 +99,23 @@ let currentHls = null;
 let userInteracted = false;
 let infoTimeout = null;
 let searchTimeout = null;
+let iptvBarTimer = null;
 
 const video = document.getElementById("streamVideo");
 const leftContainer = document.getElementById("categoriaContainer");
 const rightContainer = document.getElementById("categoriaContainerDerecha");
 const searchInput = document.getElementById("searchInput");
-const currentTitle = document.getElementById("currentTitle");
-const currentMeta = document.getElementById("currentMeta");
-const streamState = document.getElementById("streamState");
-const streamType = document.getElementById("streamType");
 const channelInfo = document.getElementById("channelInfo");
 const currentChannelName = document.getElementById("currentChannelName");
 const currentChannelCategory = document.getElementById("currentChannelCategory");
 const fullscreenBtn = document.getElementById("fullscreenBtn");
 const iptvBottomBar = document.getElementById("iptvBottomBar");
-let iptvBarTimer = null;
-
-function showIptvBar() {
-  if (!iptvBottomBar) return;
-
-  iptvBottomBar.classList.remove("iptv-hidden");
-
-  clearTimeout(iptvBarTimer);
-
-  if (document.body.classList.contains("fullscreen-active")) {
-    iptvBarTimer = setTimeout(() => {
-      hideIptvBar();
-    }, 3000);
-  }
-}
-
-function hideIptvBar() {
-  if (!iptvBottomBar) return;
-  iptvBottomBar.classList.add("iptv-hidden");
-}
-
-function handleIptvBarInteraction() {
-  showIptvBar();
-}
+const iptvChannelName = document.getElementById("iptvChannelName");
+const iptvChannelCategory = document.getElementById("iptvChannelCategory");
+const iptvStatus = document.getElementById("iptvStatus");
+const iptvClock = document.getElementById("iptvClock");
+const volverBtn = document.getElementById("volverBtn");
+const soundBtn = document.getElementById("soundBtn");
 
 function capitalize(text) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
@@ -170,24 +145,85 @@ function getChannelLogo(channelName) {
   return null;
 }
 
-function handleFirstInteraction() {
-  if (userInteracted) return;
-  userInteracted = true;
-  video.muted = false;
-  video.play().catch(() => {});
+function showIptvBar() {
+  if (!iptvBottomBar) return;
+
+  iptvBottomBar.classList.remove("iptv-hidden");
+
+  clearTimeout(iptvBarTimer);
+
+  if (document.body.classList.contains("fullscreen-active")) {
+    iptvBarTimer = setTimeout(() => {
+      hideIptvBar();
+    }, 3000);
+  }
 }
 
-document.body.addEventListener("click", handleFirstInteraction, { once: true });
-document.body.addEventListener("touchend", handleFirstInteraction, { once: true });
+function hideIptvBar() {
+  if (!iptvBottomBar) return;
+  iptvBottomBar.classList.add("iptv-hidden");
+}
+
+function handleIptvBarInteraction() {
+  showIptvBar();
+}
+
+function setIptvStatus(text, className = "") {
+  if (!iptvStatus) return;
+
+  iptvStatus.textContent = text;
+  iptvStatus.className = "iptv-badge";
+
+  if (className) {
+    iptvStatus.classList.add(className);
+  }
+}
+
+function updateIptvInfo(name, category) {
+  if (iptvChannelName) {
+    iptvChannelName.textContent = name || "Sin canal seleccionado";
+  }
+
+  if (iptvChannelCategory) {
+    iptvChannelCategory.textContent = category || "Categoría";
+  }
+}
+
+function updateChannelInfo(name, category) {
+  if (currentChannelName) {
+    currentChannelName.textContent = name;
+  }
+
+  if (currentChannelCategory) {
+    currentChannelCategory.textContent = capitalize(category);
+  }
+
+  if (channelInfo) {
+    channelInfo.style.display = "block";
+  }
+
+  updateIptvInfo(name, capitalize(category));
+  setIptvStatus("EN VIVO", "iptv-status-live");
+
+  clearTimeout(infoTimeout);
+  infoTimeout = setTimeout(() => {
+    if (channelInfo) {
+      channelInfo.style.display = "none";
+    }
+  }, 4000);
+}
 
 function showLoadingIndicator() {
   hideLoadingIndicator();
+
+  const streamContainer = document.getElementById("streamContainer");
+  if (!streamContainer) return;
 
   const loader = document.createElement("div");
   loader.className = "loading-indicator";
   loader.innerHTML = '<div class="spinner"></div><p>Cargando transmisión...</p>';
 
-  document.getElementById("streamContainer").appendChild(loader);
+  streamContainer.appendChild(loader);
 }
 
 function hideLoadingIndicator() {
@@ -203,27 +239,8 @@ function destroyCurrentHls() {
 }
 
 function setPlayerMeta(channel) {
-  currentTitle.textContent = channel.name;
-  currentMeta.textContent = "Categoría: " + capitalize(channel.category) + " · URL: " + channel.url;
-  streamType.textContent = channel.type === "video" ? "Archivo / MP4" : "Streaming HLS";
-  streamState.textContent = "Cargando...";
-
   updateIptvInfo(channel.name, capitalize(channel.category));
   setIptvStatus("CARGANDO", "iptv-status-buffer");
-}
-
-function updateChannelInfo(name, category) {
-  currentChannelName.textContent = name;
-  currentChannelCategory.textContent = capitalize(category);
-  channelInfo.style.display = "block";
-
-  updateIptvInfo(name, capitalize(category));
-  setIptvStatus("EN VIVO", "iptv-status-live");
-
-  clearTimeout(infoTimeout);
-  infoTimeout = setTimeout(() => {
-    channelInfo.style.display = "none";
-  }, 4000);
 }
 
 function setActiveChannel(button) {
@@ -239,17 +256,16 @@ function attachNativeVideo(channel) {
   const onCanPlay = () => {
     video.removeEventListener("canplay", onCanPlay);
     hideLoadingIndicator();
-    streamState.textContent = "Reproduciendo";
 
-    video.play().catch(() => {
-      streamState.textContent = "Listo para reproducir";
-    });
+    video.play().catch(() => {});
   };
 
   video.addEventListener("canplay", onCanPlay);
 }
 
 function loadStream(channel) {
+  if (!video) return;
+
   showLoadingIndicator();
   destroyCurrentHls();
 
@@ -284,18 +300,13 @@ function loadStream(channel) {
 
       currentHls.on(Hls.Events.MANIFEST_PARSED, () => {
         hideLoadingIndicator();
-        streamState.textContent = "Reproduciendo";
-
-        video.play().catch(() => {
-          streamState.textContent = "Listo para reproducir";
-        });
+        video.play().catch(() => {});
       });
 
       currentHls.on(Hls.Events.ERROR, (event, data) => {
         if (!data.fatal) return;
 
         hideLoadingIndicator();
-        streamState.textContent = "Error de reproducción";
         setIptvStatus("ERROR", "iptv-status-error");
 
         switch (data.type) {
@@ -314,7 +325,6 @@ function loadStream(channel) {
       attachNativeVideo(channel);
     } else {
       hideLoadingIndicator();
-      streamState.textContent = "No compatible";
       alert("Este navegador no soporta HLS.");
     }
   } else {
@@ -322,35 +332,32 @@ function loadStream(channel) {
   }
 }
 
-video.addEventListener("waiting", () => {
-  streamState.textContent = "Buffering...";
-  setIptvStatus("BUFFER", "iptv-status-buffer");
-  showLoadingIndicator();
-});
+if (video) {
+  video.addEventListener("waiting", () => {
+    setIptvStatus("BUFFER", "iptv-status-buffer");
+    showLoadingIndicator();
+  });
 
-video.addEventListener("playing", () => {
-  streamState.textContent = "Reproduciendo";
-  setIptvStatus("EN VIVO", "iptv-status-live");
-  hideLoadingIndicator();
-});
+  video.addEventListener("playing", () => {
+    setIptvStatus("EN VIVO", "iptv-status-live");
+    hideLoadingIndicator();
+  });
 
-video.addEventListener("pause", () => {
-  if (!video.ended && video.currentTime > 0) {
-    streamState.textContent = "Pausado";
-    setIptvStatus("PAUSA", "iptv-status-pause");
-  }
-});
+  video.addEventListener("pause", () => {
+    if (!video.ended && video.currentTime > 0) {
+      setIptvStatus("PAUSA", "iptv-status-pause");
+    }
+  });
 
-video.addEventListener("ended", () => {
-  streamState.textContent = "Finalizado";
-  setIptvStatus("FIN", "iptv-status-pause");
-});
+  video.addEventListener("ended", () => {
+    setIptvStatus("FIN", "iptv-status-pause");
+  });
 
-video.addEventListener("error", () => {
-  streamState.textContent = "Error de reproducción";
-  setIptvStatus("ERROR", "iptv-status-error");
-  hideLoadingIndicator();
-});
+  video.addEventListener("error", () => {
+    setIptvStatus("ERROR", "iptv-status-error");
+    hideLoadingIndicator();
+  });
+}
 
 function groupChannels(channels) {
   return channels.reduce((acc, channel) => {
@@ -366,6 +373,8 @@ function groupChannels(channels) {
 }
 
 function renderGroupedChannels(channels) {
+  if (!leftContainer || !rightContainer) return;
+
   leftContainer.innerHTML = "";
   rightContainer.innerHTML = "";
 
@@ -447,36 +456,39 @@ function renderGroupedChannels(channels) {
 
     section.appendChild(header);
     section.appendChild(content);
-
     leftContainer.appendChild(section);
   });
 
   rightContainer.innerHTML = "";
 }
 
-searchInput.addEventListener("input", (event) => {
-  clearTimeout(searchTimeout);
+if (searchInput) {
+  searchInput.addEventListener("input", (event) => {
+    clearTimeout(searchTimeout);
 
-  searchTimeout = setTimeout(() => {
-    const term = event.target.value.trim().toLowerCase();
+    searchTimeout = setTimeout(() => {
+      const term = event.target.value.trim().toLowerCase();
 
-    if (!term) {
-      renderGroupedChannels(CHANNELS_PROXIED);
-      return;
-    }
+      if (!term) {
+        renderGroupedChannels(CHANNELS_PROXIED);
+        return;
+      }
 
-    const filtered = CHANNELS_PROXIED.filter((channel) => {
-      return (
-        channel.name.toLowerCase().includes(term) ||
-        channel.category.toLowerCase().includes(term)
-      );
-    });
+      const filtered = CHANNELS_PROXIED.filter((channel) => {
+        return (
+          channel.name.toLowerCase().includes(term) ||
+          channel.category.toLowerCase().includes(term)
+        );
+      });
 
-    renderGroupedChannels(filtered);
-  }, 180);
-});
+      renderGroupedChannels(filtered);
+    }, 180);
+  });
+}
 
 async function toggleFullscreen() {
+  if (!fullscreenBtn) return;
+
   if (!document.fullscreenElement) {
     document.body.classList.add("fullscreen-active");
     fullscreenBtn.textContent = "Salir de completa";
@@ -505,9 +517,13 @@ async function toggleFullscreen() {
   }
 }
 
-fullscreenBtn.addEventListener("click", toggleFullscreen);
+if (fullscreenBtn) {
+  fullscreenBtn.addEventListener("click", toggleFullscreen);
+}
 
 document.addEventListener("fullscreenchange", () => {
+  if (!fullscreenBtn) return;
+
   if (!document.fullscreenElement) {
     document.body.classList.remove("fullscreen-active");
     fullscreenBtn.textContent = "Pantalla completa";
@@ -520,20 +536,34 @@ document.addEventListener("fullscreenchange", () => {
   }
 });
 
-document.getElementById("volverBtn").addEventListener("click", () => {
-  if (history.length > 1) {
-    history.back();
-  } else {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-});
+if (volverBtn) {
+  volverBtn.addEventListener("click", () => {
+    if (history.length > 1) {
+      history.back();
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  });
+}
 
-document.getElementById("soundBtn").addEventListener("click", () => {
+if (soundBtn && video) {
+  soundBtn.addEventListener("click", () => {
+    userInteracted = true;
+    video.muted = false;
+    video.volume = 1;
+    video.play().catch(() => {});
+  });
+}
+
+function handleFirstInteraction() {
+  if (userInteracted || !video) return;
   userInteracted = true;
   video.muted = false;
-  video.volume = 1;
   video.play().catch(() => {});
-});
+}
+
+document.body.addEventListener("click", handleFirstInteraction, { once: true });
+document.body.addEventListener("touchend", handleFirstInteraction, { once: true });
 
 function getFocusableElements() {
   return Array.from(
@@ -586,30 +616,10 @@ document.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("load", () => {
-  const first = document.getElementById("volverBtn");
-  if (first) first.focus();
-});
-
-const iptvChannelName = document.getElementById("iptvChannelName");
-const iptvChannelCategory = document.getElementById("iptvChannelCategory");
-const iptvStatus = document.getElementById("iptvStatus");
-const iptvClock = document.getElementById("iptvClock");
-
-function setIptvStatus(text, className = "") {
-  if (!iptvStatus) return;
-
-  iptvStatus.textContent = text;
-  iptvStatus.className = "iptv-badge";
-
-  if (className) {
-    iptvStatus.classList.add(className);
+  if (volverBtn) {
+    volverBtn.focus();
   }
-}
-
-function updateIptvInfo(name, category) {
-  if (iptvChannelName) iptvChannelName.textContent = name || "Sin canal seleccionado";
-  if (iptvChannelCategory) iptvChannelCategory.textContent = category || "Categoría";
-}
+});
 
 function startClock() {
   if (!iptvClock) return;
