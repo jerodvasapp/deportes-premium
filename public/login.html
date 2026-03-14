@@ -98,13 +98,13 @@
     }
 
     .login-card {
-      background: var(--panel);
-      border: 1px solid var(--line);
+      background: rgba(10,18,35,0.55);
+      border: 1px solid rgba(255,255,255,0.08);
       border-radius: var(--radius);
       padding: 30px;
-      box-shadow: var(--shadow);
-      -webkit-backdrop-filter: blur(16px);
-      backdrop-filter: blur(16px);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
     }
 
     .brand {
@@ -323,6 +323,18 @@
         font-size: 1.65rem;
       }
     }
+
+    .site-logo{
+      height:40px;
+      width:auto;
+    }
+    
+    .login-logo{
+      width:160px;
+      display:block;
+      margin:0 auto 18px auto;
+      filter: drop-shadow(0 0 8px rgba(255,255,255,0.25));
+    }
   </style>
 </head>
 <body>
@@ -334,7 +346,7 @@
           Acceso seguro IPTV
         </div>
 
-        <h1>Deportes Premium</h1>
+        <img src="/img/logo.png" alt="Deportes Premium" class="login-logo">
         <p>
           Inicia sesión para acceder al reproductor, a la lista de canales y a tu panel de streaming.
         </p>
@@ -376,11 +388,6 @@
           <div id="activeSessionsList"></div>
         </div>
       </form>
-
-      <div class="demo-box">
-        Demo de acceso:<br>
-        Usuario: <strong>admin</strong> / Contraseña: <strong>123456</strong>
-      </div>
 
       <div class="login-footer">
         Interfaz visual estilo IPTV moderna, pensada para escritorio, móvil y Android TV.
