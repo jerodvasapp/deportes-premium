@@ -371,7 +371,6 @@ function renderGroupedChannels(channels) {
 
   const grouped = groupChannels(channels);
   const categories = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
-  const midpoint = Math.ceil(categories.length / 2);
 
   if (!categories.length) {
     leftContainer.innerHTML = '<div class="empty-state">No se encontraron canales.</div>';
@@ -379,7 +378,7 @@ function renderGroupedChannels(channels) {
     return;
   }
 
-  categories.forEach((category, index) => {
+  categories.forEach((category) => {
     const section = document.createElement("div");
     section.className = "categoria";
 
@@ -449,12 +448,10 @@ function renderGroupedChannels(channels) {
     section.appendChild(header);
     section.appendChild(content);
 
-    if (index < midpoint) {
-      leftContainer.appendChild(section);
-    } else {
-      rightContainer.appendChild(section);
-    }
+    leftContainer.appendChild(section);
   });
+
+  rightContainer.innerHTML = "";
 }
 
 searchInput.addEventListener("input", (event) => {
