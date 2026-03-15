@@ -165,6 +165,7 @@ main {
 .sidebar,
 .player-column {
   min-width: 0;
+  position: relative;
 }
 
 .sidebar,
@@ -192,6 +193,7 @@ main {
 
 #streamContainer {
   position: relative;
+  z-index: 1;
   overflow: hidden;
   padding: 18px;
 
@@ -661,10 +663,23 @@ body.fullscreen-active #iptvBottomBar {
 
   .sidebar {
     order: 2;
+    position: relative;
+    z-index: 20;
   }
 
   .player-column {
     order: 1;
+    position: relative;
+    z-index: 1;
+  }
+
+  #streamContainer {
+    z-index: 1;
+  }
+
+  #streamVideo {
+    position: relative;
+    z-index: 1;
   }
 
   #botonesDerecha {
