@@ -677,6 +677,7 @@
           </div>
 
           <button class="action-btn" type="submit">Crear usuario</button>
+          <button class="action-btn secondary" id="createDemoBtn" type="button">Crear demo 45 min</button>
           <button class="action-btn secondary" id="reloadAllBtn" type="button">Actualizar datos</button>
           <div class="msg" id="createMsg"></div>
         </form>
@@ -719,6 +720,8 @@
                     <th>Rol</th>
                     <th>Inicio</th>
                     <th>Fin</th>
+                    <th>Días</th>
+                    <th>Sesiones</th>
                     <th>Estado</th>
                     <th>Creado</th>
                     <th>Acciones</th>
@@ -792,6 +795,21 @@
       return value || "-";
     }
 
+    function getRemainingDays(endDate) {
+      if (!endDate) return "-";
+
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+
+      const fin = new Date(endDate + "T00:00:00");
+      const diff = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
+
+      if (diff < 0) return "vencido";
+      if (diff === 0) return "hoy";
+      if (diff === 1) return "1 día";
+      return `${diff} días`;
+    }
+
     function updateStats(users) {
       document.getElementById("statTotal").textContent = users.length;
       document.getElementById("statActive").textContent = users.filter(u => u.status === "activo").length;
@@ -818,7 +836,7 @@
       tbody.innerHTML = "";
 
       if (!users.length) {
-        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">No hay usuarios.</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state">No hay usuarios.</div></td></tr>';
         return;
       }
 
@@ -836,6 +854,10 @@
         <span class="user-id">ID: ${user.id}${isCurrentAdmin ? " · Sesión actual" : ""}</span>
       </div>
     </td>
+
+    <td>${getRemainingDays(user.end_date)}</td>
+    <td>${user.active_sessions || 0} / 2</td>
+    
     <td>
       <select class="compact-select" id="role-${user.id}" ${isCurrentAdmin ? "disabled" : ""}>
         <option value="user" ${user.role === "user" ? "selected" : ""}>user</option>
@@ -866,6 +888,7 @@
     <td>
       <div class="actions-cell">
         <button class="mini-btn save" onclick="updateUser(${user.id})">Guardar</button>
+        <button class="mini-btn activate" onclick="renewUser(${user.id}, 30)">+30 días</button>
 
         ${
           isCurrentAdmin
@@ -891,32 +914,47 @@
     }
 
     async function updateUser(id) {
-  const user = allUsers.find(u => u.id === id);
-  const isCurrentAdmin = currentAdmin && currentAdmin.id === id;
+      const user = allUsers.find(u => u.id === id);
+      const isCurrentAdmin = currentAdmin && currentAdmin.id === id;
 
-  if (isCurrentAdmin) {
-    alert("No puedes cambiar tu propio rol o estado desde esta pantalla.");
-    return;
-  }
+      if (isCurrentAdmin) {
+        alert("No puedes cambiar tu propio rol o estado desde esta pantalla.");
+        return;
+      }
 
-  const role = document.getElementById(`role-${id}`).value;
-  const start_date = document.getElementById(`start-${id}`).value || null;
-  const end_date = document.getElementById(`end-${id}`).value || null;
-  const status = document.getElementById(`status-${id}`).value;
+      const role = document.getElementById(`role-${id}`).value;
+      const start_date = document.getElementById(`start-${id}`).value || null;
+      const end_date = document.getElementById(`end-${id}`).value || null;
+      const status = document.getElementById(`status-${id}`).value;
 
-  const res = await fetch(`/admin/users/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, start_date, end_date, status })
-  });
+      const res = await fetch(`/admin/users/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, start_date, end_date, status })
+      });
 
-  const data = await res.json();
-  alert(data.message || "Usuario actualizado");
+      const data = await res.json();
+      alert(data.message || "Usuario actualizado");
 
-  if (res.ok) {
-    await loadUsers();
-  }
-}
+      if (res.ok) {
+        await loadUsers();
+      }
+    }
+
+        async function renewUser(id, days) {
+      const res = await fetch(`/admin/users/${id}/renew`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ days })
+      });
+
+      const data = await res.json();
+      alert(data.message || "Servicio renovado");
+
+      if (res.ok) {
+        await loadUsers();
+      }
+    }
 
     async function quickActivate(id) {
   if (currentAdmin && currentAdmin.id === id) {
@@ -938,6 +976,21 @@
       status: "activo"
     })
   });
+
+    async function renewUser(id, days) {
+      const res = await fetch(`/admin/users/${id}/renew`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ days })
+      });
+
+      const data = await res.json();
+      alert(data.message || "Servicio renovado");
+
+      if (res.ok) {
+        await loadUsers();
+      }
+    }
 
   const data = await res.json();
   alert(data.message || "Usuario activado");
@@ -993,7 +1046,8 @@
         role: document.getElementById("role").value,
         start_date: document.getElementById("start_date").value || null,
         end_date: document.getElementById("end_date").value || null,
-        status: document.getElementById("status").value
+        status: document.getElementById("status").value,
+        demo_minutes: 0
       };
 
       const res = await fetch("/admin/users", {
@@ -1072,6 +1126,48 @@
     }
 
     document.getElementById("createUserForm").addEventListener("submit", createUser);
+    document.getElementById("createDemoBtn").addEventListener("click", async () => {
+  const createMsg = document.getElementById("createMsg");
+
+  const payload = {
+    username: document.getElementById("username").value.trim(),
+    password: document.getElementById("password").value.trim(),
+    role: "user",
+    start_date: null,
+    end_date: null,
+    status: "activo",
+    demo_minutes: 1
+  };
+
+  if (!payload.username || !payload.password) {
+    createMsg.textContent = "Usuario y contraseña son obligatorios";
+    createMsg.style.color = "#ffbcc6";
+    return;
+  }
+
+  const res = await fetch("/admin/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    createMsg.textContent = data.message || "No se pudo crear el demo";
+    createMsg.style.color = "#ffbcc6";
+    return;
+  }
+
+  createMsg.textContent = data.message || "Demo creado";
+  createMsg.style.color = "#9ff0b8";
+
+  document.getElementById("createUserForm").reset();
+  document.getElementById("role").value = "user";
+  document.getElementById("status").value = "activo";
+
+  await loadUsers();
+});
     document.getElementById("loadLogsBtn").addEventListener("click", loadLogs);
     document.getElementById("reloadAllBtn").addEventListener("click", async () => {
       await loadUsers();

@@ -30,6 +30,15 @@
     </div>
   </header>
 
+  <div id="diasRestantesPopup" class="dias-popup" hidden>
+  <div class="dias-popup-card">
+    <h3>Estado de tu servicio</h3>
+    <p id="diasRestantesTexto"></p>
+    <div id="demoTimer" class="demo-timer"></div>
+    <button id="cerrarPopup">Cerrar</button>
+  </div>
+</div>
+
   <main>
     <aside class="sidebar" id="botonesIzquierda">
       <input
@@ -58,6 +67,7 @@
           </div>
 
           <div class="iptv-right">
+            <span id="demoBadge" class="demo-badge" hidden>Demo: --:--</span>
             <span id="iptvClock">00:00</span>
           </div>
         </div>
@@ -83,6 +93,7 @@
         <div class="top-buttons">
           <button id="volverBtn" type="button">⬅️ Volver</button>
           <button id="fullscreenBtn" type="button">Pantalla completa</button>
+          <button id="refreshBtn" type="button">🔄 Recargar</button>
 
           <a
             id="infoBtn"

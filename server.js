@@ -1,5 +1,3 @@
-// Crear la base de datos de usuarios
-
 const express = require("express");
 const session = require("express-session");
 const sqlite3 = require("sqlite3").verbose();
@@ -78,10 +76,21 @@ db.serialize(() => {
       role TEXT NOT NULL DEFAULT 'user',
       start_date TEXT,
       end_date TEXT,
+      expires_at TEXT,
       status TEXT NOT NULL DEFAULT 'activo',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  db.run(
+    `ALTER TABLE users ADD COLUMN expires_at TEXT`,
+    [],
+    (err) => {
+      if (err && !String(err.message || "").includes("duplicate column name")) {
+        console.error("Error agregando expires_at:", err.message);
+      }
+    }
+  );
 
   db.run(`
     CREATE TABLE IF NOT EXISTS access_logs (
@@ -121,6 +130,10 @@ function cleanupUserSessions() {
 }
 
 function isUserExpired(user) {
+  if (user.expires_at) {
+    return new Date() > new Date(user.expires_at);
+  }
+
   if (!user.end_date) return false;
 
   const today = new Date();
@@ -138,18 +151,58 @@ function isUserNotStarted(user) {
   return today < startDate;
 }
 
+function getBogotaNow() {
+  const now = new Date();
+  const bogota = new Date(
+    now.toLocaleString("en-US", { timeZone: "America/Bogota" })
+  );
+  return bogota;
+}
+
+function formatSQLiteDateTime(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 function requireAuth(req, res, next) {
-  if (!req.session || !req.session.user) {
+  if (!req.session || !req.session.user || !req.sessionID) {
     return res.redirect("/login.html");
   }
-  next();
+
+  db.get(
+    "SELECT id FROM user_sessions WHERE session_id = ? AND user_id = ?",
+    [req.sessionID, req.session.user.id],
+    (err, row) => {
+      if (err || !row) {
+        return req.session.destroy(() => {
+          return res.redirect("/login.html");
+        });
+      }
+
+      next();
+    }
+  );
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.session || !req.session.user || req.session.user.role !== "admin") {
+  if (!req.session || !req.session.user || req.session.user.role !== "admin" || !req.sessionID) {
     return res.status(403).json({ ok: false, message: "Acceso denegado" });
   }
-  next();
+
+  db.get(
+    "SELECT id FROM user_sessions WHERE session_id = ? AND user_id = ?",
+    [req.sessionID, req.session.user.id],
+    (err, row) => {
+      if (err || !row) {
+        return req.session.destroy(() => {
+          return res.status(403).json({ ok: false, message: "Sesión inválida" });
+        });
+      }
+
+      next();
+    }
+  );
 }
 
 // =========================
@@ -159,6 +212,12 @@ function requireAdmin(req, res, next) {
 const loginAttempts = new Map();
 
 function loginRateLimit(req, res, next) {
+  const username = String(req.body?.username || "").trim().toLowerCase();
+
+  if (username === "admin") {
+    return next();
+  }
+
   const ip = req.ip;
   const now = Date.now();
   const windowMs = 10 * 60 * 1000;
@@ -503,69 +562,202 @@ app.post("/login", loginRateLimit, (req, res) => {
 
     cleanupUserSessions();
 
-    db.run("DELETE FROM user_sessions WHERE session_id = ?", [req.sessionID], () => {
-      db.all(
-        "SELECT * FROM user_sessions WHERE user_id = ?",
-        [user.id],
-        (sessionErr, sessions) => {
-          if (sessionErr) {
-            return res.status(500).json({ ok: false, message: "Error validando sesiones activas" });
-          }
-
-          if (sessions.length >= 2) {
-            return res.status(403).json({
-              ok: false,
-              code: "MAX_SESSIONS",
-              message: "Máximo 2 conexiones activas permitidas para este usuario",
-              sessions: sessions.map((s) => ({
-                session_id: s.session_id,
-                ip_address: s.ip_address,
-                user_agent: s.user_agent,
-                created_at: s.created_at,
-                last_seen: s.last_seen
-              }))
-            });
-          }
-
-          req.session.user = {
-            id: user.id,
-            username: user.username,
-            role: user.role
-          };
-
-          db.run(
-            `INSERT INTO access_logs (user_id, username, ip_address, user_agent, success)
-             VALUES (?, ?, ?, ?, ?)`,
-            [user.id, user.username, req.ip, req.get("user-agent"), 1]
-          );
-
-          db.run(
-            `INSERT INTO user_sessions (user_id, username, session_id, ip_address, user_agent)
-             VALUES (?, ?, ?, ?, ?)`,
-            [user.id, user.username, req.sessionID, req.ip, req.get("user-agent")],
-            (insertErr) => {
-              if (insertErr) {
-                console.error("Error guardando sesión activa:", insertErr);
-              }
-
-              return res.json({ ok: true, message: "Login correcto" });
-            }
-          );
+    db.serialize(() => {
+      db.run("BEGIN IMMEDIATE TRANSACTION", (beginErr) => {
+        if (beginErr) {
+          console.error("Error iniciando transacción de login:", beginErr);
+          return res.status(500).json({ ok: false, message: "No se pudo iniciar el login" });
         }
-      );
+
+        db.run(
+          "DELETE FROM user_sessions WHERE session_id = ?",
+          [req.sessionID],
+          (selfDeleteErr) => {
+            if (selfDeleteErr) {
+              return db.run("ROLLBACK", () => {
+                console.error("Error limpiando sesión actual antes del login:", selfDeleteErr);
+                return res.status(500).json({ ok: false, message: "Error preparando la sesión" });
+              });
+            }
+
+            db.all(
+              "SELECT * FROM user_sessions WHERE user_id = ? ORDER BY last_seen ASC, created_at ASC",
+              [user.id],
+              (sessionErr, sessions) => {
+                if (sessionErr) {
+                  return db.run("ROLLBACK", () => {
+                    return res.status(500).json({ ok: false, message: "Error validando sesiones activas" });
+                  });
+                }
+
+                const continueInsert = () => {
+                  req.session.user = {
+                    id: user.id,
+                    username: user.username,
+                    role: user.role
+                  };
+
+                  db.run(
+                    `INSERT INTO user_sessions (user_id, username, session_id, ip_address, user_agent)
+                     VALUES (?, ?, ?, ?, ?)`,
+                    [user.id, user.username, req.sessionID, req.ip, req.get("user-agent")],
+                    (insertErr) => {
+                      if (insertErr) {
+                        return db.run("ROLLBACK", () => {
+                          console.error("Error guardando sesión activa:", insertErr);
+                          return res.status(500).json({
+                            ok: false,
+                            message: "No se pudo registrar la sesión"
+                          });
+                        });
+                      }
+
+                      const commitLogin = () => {
+                        db.run("COMMIT", (commitErr) => {
+                          if (commitErr) {
+                            return db.run("ROLLBACK", () => {
+                              console.error("Error confirmando login:", commitErr);
+                              return res.status(500).json({
+                                ok: false,
+                                message: "No se pudo completar el login"
+                              });
+                            });
+                          }
+
+                          db.run(
+                            `INSERT INTO access_logs (user_id, username, ip_address, user_agent, success)
+                             VALUES (?, ?, ?, ?, ?)`,
+                            [user.id, user.username, req.ip, req.get("user-agent"), 1]
+                          );
+
+                          return res.json({ ok: true, message: "Login correcto" });
+                        });
+                      };
+
+                      if (user.role === "admin") {
+                        return commitLogin();
+                      }
+
+                      db.run(
+                        `DELETE FROM user_sessions
+                         WHERE user_id = ?
+                         AND session_id NOT IN (
+                           SELECT session_id
+                           FROM user_sessions
+                           WHERE user_id = ?
+                           ORDER BY last_seen DESC, created_at DESC
+                           LIMIT 2
+                         )`,
+                        [user.id, user.id],
+                        (trimErr) => {
+                          if (trimErr) {
+                            return db.run("ROLLBACK", () => {
+                              console.error("Error recortando sesiones sobrantes:", trimErr);
+                              return res.status(500).json({
+                                ok: false,
+                                message: "No se pudo ajustar el límite de sesiones"
+                              });
+                            });
+                          }
+
+                          return commitLogin();
+                        }
+                      );
+                    }
+                  );
+                };
+
+                if (user.role === "admin") {
+                  return continueInsert();
+                }
+
+                const maxSessions = 2;
+                const sessionsToDelete = Math.max(0, sessions.length - (maxSessions - 1));
+
+                if (sessionsToDelete <= 0) {
+                  return continueInsert();
+                }
+
+                const oldSessions = sessions.slice(0, sessionsToDelete);
+                const idsToDelete = oldSessions.map((s) => s.session_id);
+                const placeholders = idsToDelete.map(() => "?").join(",");
+
+                db.run(
+                  `DELETE FROM user_sessions WHERE session_id IN (${placeholders})`,
+                  idsToDelete,
+                  (deleteErr) => {
+                    if (deleteErr) {
+                      return db.run("ROLLBACK", () => {
+                        return res.status(500).json({
+                          ok: false,
+                          message: "Error liberando sesiones antiguas"
+                        });
+                      });
+                    }
+
+                    return continueInsert();
+                  }
+                );
+              }
+            );
+          }
+        );
+      });
     });
   });
 });
 
 app.get("/api/session", (req, res) => {
-  if (!req.session || !req.session.user) {
+  if (!req.session || !req.session.user || !req.sessionID) {
     return res.status(401).json({ loggedIn: false });
   }
 
-  return res.json({
-    loggedIn: true,
-    user: req.session.user
-  });
+  db.get(
+    "SELECT id FROM user_sessions WHERE session_id = ? AND user_id = ?",
+    [req.sessionID, req.session.user.id],
+    (sessionErr, sessionRow) => {
+      if (sessionErr || !sessionRow) {
+        return req.session.destroy(() => {
+          return res.status(401).json({ loggedIn: false });
+        });
+      }
+
+      db.get(
+        "SELECT start_date, end_date, expires_at, status FROM users WHERE id = ?",
+        [req.session.user.id],
+        (err, row) => {
+          if (err) {
+            return res.status(500).json({ loggedIn: false });
+          }
+
+          return res.json({
+            loggedIn: true,
+            user: {
+              ...req.session.user,
+              start_date: row?.start_date,
+              end_date: row?.end_date,
+              expires_at: row?.expires_at,
+              status: row?.status
+            }
+          });
+        }
+      );
+    }
+  );
+});
+
+app.post("/logout", (req, res) => {
+  if (req.session) {
+    const sid = req.sessionID;
+
+    db.run("DELETE FROM user_sessions WHERE session_id = ?", [sid], () => {
+      req.session.destroy(() => {
+        res.json({ ok: true });
+      });
+    });
+  } else {
+    res.json({ ok: true });
+  }
 });
 
 app.post("/api/close-session", async (req, res) => {
@@ -635,9 +827,19 @@ app.post("/api/close-session", async (req, res) => {
 
 app.get("/admin/users", requireAdmin, (req, res) => {
   db.all(
-    `SELECT id, username, role, start_date, end_date, status, created_at
-     FROM users
-     ORDER BY id DESC`,
+    `SELECT 
+      u.id,
+      u.username,
+      u.role,
+      u.start_date,
+      u.end_date,
+      u.status,
+      u.created_at,
+      COUNT(us.id) AS active_sessions
+     FROM users u
+     LEFT JOIN user_sessions us ON us.user_id = u.id
+     GROUP BY u.id, u.username, u.role, u.start_date, u.end_date, u.status, u.created_at
+     ORDER BY u.id DESC`,
     [],
     (err, rows) => {
       if (err) {
@@ -650,7 +852,8 @@ app.get("/admin/users", requireAdmin, (req, res) => {
 });
 
 app.post("/admin/users", requireAdmin, async (req, res) => {
-  const { username, password, role, start_date, end_date, status } = req.body;
+  const { username, password, role, start_date, end_date, status, demo_minutes } = req.body;
+  const createdAt = formatSQLiteDateTime(getBogotaNow());
 
   if (!username || !password) {
     return res.status(400).json({ ok: false, message: "Usuario y contraseña son obligatorios" });
@@ -658,23 +861,38 @@ app.post("/admin/users", requireAdmin, async (req, res) => {
 
   const hash = await bcrypt.hash(password, 10);
 
+  const minutes = Number(demo_minutes) || 0;
+  const bogotaNow = getBogotaNow();
+  const expiresAt =
+    minutes > 0
+      ? formatSQLiteDateTime(new Date(bogotaNow.getTime() + minutes * 60 * 1000))
+      : null;
+
   db.run(
-    `INSERT INTO users (username, password_hash, role, start_date, end_date, status)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO users (username, password_hash, role, start_date, end_date, expires_at, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       username,
       hash,
       role || "user",
       start_date || null,
       end_date || null,
-      status || "activo"
+      expiresAt,
+      status || "activo",
+      createdAt
     ],
     function (err) {
       if (err) {
         return res.status(500).json({ ok: false, message: "No se pudo crear el usuario" });
       }
 
-      res.json({ ok: true, id: this.lastID, message: "Usuario creado" });
+      res.json({
+        ok: true,
+        id: this.lastID,
+        message: expiresAt
+          ? `Demo creado por ${minutes} minutos`
+          : "Usuario creado"
+      });
     }
   );
 });
@@ -703,6 +921,70 @@ app.put("/admin/users/:id", requireAdmin, (req, res) => {
       }
 
       res.json({ ok: true, message: "Usuario actualizado" });
+    }
+  );
+});
+
+app.put("/admin/users/:id/renew", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const days = Number(req.body.days) || 0;
+
+  if (days <= 0) {
+    return res.status(400).json({
+      ok: false,
+      message: "Cantidad de días inválida"
+    });
+  }
+
+  db.get(
+    "SELECT end_date, expires_at FROM users WHERE id = ?",
+    [id],
+    (err, user) => {
+      if (err || !user) {
+        return res.status(500).json({
+          ok: false,
+          message: "No se pudo cargar el usuario"
+        });
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      let baseDate;
+
+      if (user.end_date) {
+        const currentEnd = new Date(user.end_date + "T00:00:00");
+        baseDate = currentEnd >= today ? currentEnd : today;
+      } else {
+        baseDate = today;
+      }
+
+      baseDate.setDate(baseDate.getDate() + days);
+
+      const yyyy = baseDate.getFullYear();
+      const mm = String(baseDate.getMonth() + 1).padStart(2, "0");
+      const dd = String(baseDate.getDate()).padStart(2, "0");
+      const newEndDate = `${yyyy}-${mm}-${dd}`;
+
+      db.run(
+        `UPDATE users
+         SET end_date = ?, expires_at = NULL, status = 'activo'
+         WHERE id = ?`,
+        [newEndDate, id],
+        function (updateErr) {
+          if (updateErr) {
+            return res.status(500).json({
+              ok: false,
+              message: "No se pudo renovar el servicio"
+            });
+          }
+
+          return res.json({
+            ok: true,
+            message: `Servicio renovado hasta ${newEndDate}`
+          });
+        }
+      );
     }
   );
 });

@@ -2,6 +2,8 @@
 const userBadge = document.getElementById("userBadge");
 const adminLink = document.getElementById("adminLink");
 
+let demoTimerInterval = null;
+
 async function checkSession() {
   try {
     const response = await fetch("/api/session");
@@ -25,12 +27,136 @@ async function checkSession() {
     if (adminLink) {
       adminLink.hidden = !(data.user && data.user.role === "admin");
     }
+
+    const popup = document.getElementById("diasRestantesPopup");
+    const texto = document.getElementById("diasRestantesTexto");
+    const demoTimer = document.getElementById("demoTimer");
+    const cerrar = document.getElementById("cerrarPopup");
+    const demoBadge = document.getElementById("demoBadge");
+
+    if (demoTimer) {
+      demoTimer.textContent = "";
+    }
+
+    if (data.user.expires_at && popup && texto && demoTimer && demoBadge) {
+      const expires = new Date(data.user.expires_at);
+      
+      texto.textContent = "Tiempo restante del demo:";
+      popup.hidden = false;
+      demoBadge.hidden = false;
+      
+      if (demoTimerInterval) {
+        clearInterval(demoTimerInterval);
+      }
+      
+      const updateDemoTimer = () => {
+        const now = new Date();
+        const diff = expires - now;
+        
+      if (diff <= 0) {
+        demoExpired = true;
+
+        demoTimer.textContent = "Demo finalizado";
+        demoBadge.textContent = "Demo finalizado";
+        demoBadge.className = "demo-badge demo-danger";
+
+        destroyCurrentHls();
+
+        const video = document.getElementById("streamVideo");
+        if (video) {
+          video.pause();
+          video.removeAttribute("src");
+          video.load();
+          video.controls = false;
+        }
+
+        document.querySelectorAll(".canales button").forEach((btn) => {
+          btn.disabled = true;
+        });
+
+        texto.textContent = "❌ Tu demo ha finalizado. Contacta a tu vendedor.";
+        popup.hidden = false;
+
+        if (demoTimerInterval) {
+          clearInterval(demoTimerInterval);
+          demoTimerInterval = null;
+        }
+
+        return;
+      }
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    demoTimer.textContent = `${minutes}m ${seconds}s`;
+    demoBadge.textContent = `Demo: ${minutes}m ${String(seconds).padStart(2, "0")}s`;
+
+    if (minutes < 5) {
+      demoBadge.className = "demo-badge demo-danger";
+    } else if (minutes < 10) {
+      demoBadge.className = "demo-badge demo-warning";
+    } else {
+      demoBadge.className = "demo-badge";
+    }
+  };
+
+  updateDemoTimer();
+  demoTimerInterval = setInterval(updateDemoTimer, 1000);
+}
+
+    if (data.user.end_date && popup && texto && !data.user.expires_at) {
+      const hoy = new Date();
+      const fin = new Date(data.user.end_date);
+      const dias = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
+
+      if (dias === 1) {
+        texto.textContent = "⚠️ Tu servicio vence mañana. Contacta a tu Vendedor.";
+        popup.hidden = false;
+      }
+
+      if (dias <= 0) {
+        serviceExpired = true;
+
+        texto.textContent = "❌ Tu servicio está vencido. Contacta a tu Vendedor.";
+        popup.hidden = false;
+
+        destroyCurrentHls();
+
+        const video = document.getElementById("streamVideo");
+        if (video) {
+          video.pause();
+          video.removeAttribute("src");
+          video.load();
+          video.controls = false;
+        }
+
+        document.querySelectorAll(".canales button").forEach((btn) => {
+          btn.disabled = true;
+        });
+      }
+    }
+
+    if (cerrar && popup) {
+      cerrar.onclick = async () => {
+        popup.hidden = true;
+
+        if (demoExpired || serviceExpired) {
+          try {
+            await fetch("/logout", { method: "POST" });
+          } catch (e) {}
+
+          window.location.href = "/login.html";
+        }
+      };
+    }
   } catch (error) {
     window.location.href = "/login.html";
   }
 }
 
 checkSession();
+
 
 function proxifyChannelUrl(url, type) {
   if (!url || typeof url !== "string") return url;
@@ -61,7 +187,32 @@ const CHANNELS = [
   { name: "Win Sports +", category: "Win Sport", url: "http://167.17.67.240:8888/WINMASHDECUADOR/tracks-v1a1/mono.m3u8", type: "hls" },
   { name: "Dsports", category: "Dgo", url: "http://167.17.67.240:8888/Dsportsmas/tracks-v1a1/mono.m3u8", type: "hls" },
   { name: "Dsports+", category: "Dgo", url: "http://167.17.67.240:8888/DSPORTS/tracks-v1a1/mono.m3u8", type: "hls" },
-  { name: "Dsports2", category: "Dgo", url: "http://167.17.67.240:8888/dsport2colombia/tracks-v1a1/mono.m3u8", type: "hls" }
+  { name: "Dsports2", category: "Dgo", url: "http://167.17.67.240:8888/dsport2colombia/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Fox Sports", category: "Fox Sports", url: "http://167.17.67.240:8888/Foxdeportes/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Fox Sports 2", category: "Fox Sports", url: "http://167.17.67.240:8888/FOXSPORTS/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Fox Sports 3", category: "Fox Sports", url: "http://167.17.67.240:8888/FOXSPORTS3/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Fox Sports 4 ", category: "Fox Sports", url: "http://167.17.67.240:8888/foxsportsdiablo/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Fox Sports 5", category: "Fox Sports", url: "http://167.17.67.240:8888/foxone1/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Fox Sports 6", category: "Fox Sports", url: "http://167.17.67.240:8888/FOXSPORTSTUBI/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Win sd", category: "Win Sport", url: "http://167.17.67.240:8888/winmassddany/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Win + 4K", category: "Win Sport", url: "http://167.17.67.240:8888/winmas4k/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Dazn 1", category: "Dazn", url: "http://167.17.67.240:8888/dazn1/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Dazn 2", category: "Dazn", url: "http://167.17.67.240:8888/DAZNFL/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Dazn la liga", category: "Dazn", url: "http://167.17.67.240:8888/DAZN4/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Tigo Sports", category: "Tigo Sports", url: "http://167.17.67.240:8888/Tigosports/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "TNT Sports Premium", category: "TNT Sports", url: "http://167.17.67.240:8888/tntsports/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Movistar", category: "Movistar", url: "http://167.17.67.240:8888/MovistarVAMOS/tracks-v1a1/mono.m3u", type: "hls" },
+  { name: "Movistar1", category: "Movistar", url: "http://167.17.67.240:8888/ligacampeones/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Bein Sports", category: "Bein", url: "http://167.17.67.240:8888/beinsports/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "TyC Sports", category: "TyC Sports", url: "http://167.17.67.240:8888/TyCSposrts/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "L1 Max", category: "L1max", url: "http://167.17.67.240:8888/La1/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "ECDF", category: "ECDF", url: "http://167.17.67.240:8888/ecdfecuador/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Otros", category: "Otros", url: "https://d63fabad.wurl.com/manifest/f36d25e7e52f1ba8d7e56eb859c636563214f541/UmFrdXRlblRWLWVzX0ZJRkFQbHVzU3BhbmlzaF9ITFM/ce61c15a-ca22-4d3f-9485-4ae94418925d/3.m3u8", type: "hls" },
+  { name: "FTV HD", category: "FTV", url: "https://master.tucableip.com/ftvhd/tracks-v1a1/mono.ts.m3u8", type: "hls" },
+  { name: "Sky sports", category: "Sky", url: "http://167.17.67.240:8888/SKYBUNDESLIGA/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Caracol", category: "Nacionales", url: "http://167.17.67.240:8888/caracilfulhd/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "Caracol SD", category: "Nacionales", url: "http://167.17.67.240:8888/CARACOLSD/tracks-v1a1/mono.m3u8", type: "hls" },
+  { name: "RCN", category: "Nacionales", url: "http://167.17.67.240:8888/Rcn/tracks-v1a1/mono.m3u8", type: "hls" }
 ];
 
 const CHANNELS_PROXIED = CHANNELS.map((channel) => ({
@@ -72,27 +223,42 @@ const CHANNELS_PROXIED = CHANNELS.map((channel) => ({
 const CHANNEL_COLORS = [
   { match: "espn", color: "linear-gradient(135deg, #d90429, #ff4d6d)" },
   { match: "fox", color: "linear-gradient(135deg, #0038a8, #3a86ff)" },
-  { match: "tnt", color: "linear-gradient(135deg, #ff7b00, #ffb703)" },
-  { match: "dazn", color: "linear-gradient(135deg, #111111, #333333)" },
-  { match: "win", color: "linear-gradient(135deg, #00a651, #25d366)" },
+  { match: "tnt", color: "linear-gradient(135deg, #6601b962, #f703ff)" },
+  { match: "dazn", color: "linear-gradient(135deg, #807d7d, #111111)" },
+  { match: "win", color: "linear-gradient(135deg, #ff6803, #386b72)" },
   { match: "tudn", color: "linear-gradient(135deg, #008f5a, #00c46a)" },
   { match: "sky", color: "linear-gradient(135deg, #0057b8, #00a8ff)" },
   { match: "bein", color: "linear-gradient(135deg, #5a189a, #9d4edd)" },
   { match: "dsports", color: "linear-gradient(135deg, #1b4fd6, #4ea8ff)" },
-  { match: "directv", color: "linear-gradient(135deg, #1b4fd6, #4ea8ff)" }
+  { match: "directv", color: "linear-gradient(135deg, #1b4fd6, #4ea8ff)" },
+  { match: "ecdf", color: "linear-gradient(135deg, #d90429, #ff4d6d)" },
+  { match: "ftv", color: "linear-gradient(135deg, #d90429, #ff4d6d)" },
+  { match: "l1", color: "linear-gradient(135deg, #d90429, #ff4d6e57)" },
+  { match: "movistar", color: "linear-gradient(135deg, #84c5fa, #00a8ff)" },
+  { match: "caracol", color: "linear-gradient(135deg, #585be9, #234a5e)" },
+  { match: "tigo", color: "linear-gradient(135deg, #1b1ee7, #e7eb13)" },
+  { match: "tyc", color: "linear-gradient(135deg, #010497, #fafaf8)" }
 ];
 
 const CHANNEL_LOGOS = [
   { match: "espn", file: "img/espn.png", alt: "ESPN" },
   { match: "fox sports", file: "img/fox-sports.png", alt: "FOX Sports" },
-  { match: "tnt sports", file: "img/tnt-sports.png", alt: "TNT Sports" },
+  { match: "tnt sports", file: "img/tnt.png", alt: "TNT Sports" },
   { match: "dazn", file: "img/dazn.png", alt: "DAZN" },
   { match: "win", file: "img/win-sports.png", alt: "Win Sports" },
   { match: "tudn", file: "img/tudn.png", alt: "TUDN" },
   { match: "directv", file: "img/directv-sports.png", alt: "DirecTV Sports" },
   { match: "dsports", file: "img/directv-sports.png", alt: "DirecTV Sports" },
   { match: "bein", file: "img/bein-sports.png", alt: "beIN Sports" },
-  { match: "sky", file: "img/sky-sports.png", alt: "Sky Sports" }
+  { match: "sky", file: "img/sky.png", alt: "Sky Sports" },
+  { match: "ecdf", file: "img/ecdf.jpg", alt: "ecdf" },
+  { match: "ftv", file: "img/ftv.png", alt: "ftv" },
+  { match: "l1 max", file: "img/l1max.png", alt: "L1 MAX" },
+  { match: "movistar", file: "img/movistartv.png", alt: "Movistar" },
+  { match: "caracol", file: "img/caracol.png", alt: "Caracol" },
+  { match: "rcn", file: "img/rcn.png", alt: "rcn" },
+  { match: "tigo", file: "img/tigo.png", alt: "tigo" },
+  { match: "tyc", file: "img/tyc.png", alt: "tyc" }
 ];
 
 let currentHls = null;
@@ -100,6 +266,10 @@ let userInteracted = false;
 let infoTimeout = null;
 let searchTimeout = null;
 let iptvBarTimer = null;
+let activeChannel = null;
+let stalledRefreshTimer = null;
+let demoExpired = false;
+let serviceExpired = false;
 
 const video = document.getElementById("streamVideo");
 const leftContainer = document.getElementById("categoriaContainer");
@@ -116,6 +286,7 @@ const iptvStatus = document.getElementById("iptvStatus");
 const iptvClock = document.getElementById("iptvClock");
 const volverBtn = document.getElementById("volverBtn");
 const soundBtn = document.getElementById("soundBtn");
+const refreshBtn = document.getElementById("refreshBtn");
 
 function capitalize(text) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
@@ -265,6 +436,14 @@ function attachNativeVideo(channel) {
 
 function loadStream(channel) {
   if (!video) return;
+  if (demoExpired || serviceExpired) return;
+
+  activeChannel = channel;
+
+if (stalledRefreshTimer) {
+  clearTimeout(stalledRefreshTimer);
+  stalledRefreshTimer = null;
+}
 
   showLoadingIndicator();
   destroyCurrentHls();
@@ -274,6 +453,18 @@ function loadStream(channel) {
 
   setPlayerMeta(channel);
   updateChannelInfo(channel.name, channel.category);
+
+  if (window.innerWidth <= 768) {
+  setTimeout(async () => {
+    try {
+      if (video.requestFullscreen) {
+        await video.requestFullscreen();
+      } else if (video.webkitEnterFullscreen) {
+        video.webkitEnterFullscreen();
+      }
+    } catch (error) {}
+  }, 500);
+}
 
   const isHls = channel.type === "hls" || channel.url.toLowerCase().includes(".m3u8");
 
@@ -356,6 +547,16 @@ if (video) {
   video.addEventListener("error", () => {
     setIptvStatus("ERROR", "iptv-status-error");
     hideLoadingIndicator();
+
+    if (activeChannel) {
+      setTimeout(() => {
+        destroyCurrentHls();
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+        loadStream(activeChannel);
+      }, 2000);
+    }
   });
 }
 
@@ -392,7 +593,7 @@ function renderGroupedChannels(channels) {
     section.className = "categoria";
 
     const header = document.createElement("h3");
-    header.textContent = "🎬 " + capitalize(category);
+    header.textContent = "⚽ " + capitalize(category);
     header.tabIndex = 0;
     header.setAttribute("role", "button");
     header.setAttribute("aria-expanded", "false");
@@ -548,6 +749,8 @@ if (volverBtn) {
 
 if (soundBtn && video) {
   soundBtn.addEventListener("click", () => {
+    if (demoExpired || serviceExpired) return;
+
     userInteracted = true;
     video.muted = false;
     video.volume = 1;
@@ -555,8 +758,21 @@ if (soundBtn && video) {
   });
 }
 
+if (refreshBtn && video) {
+  refreshBtn.addEventListener("click", () => {
+    if (!activeChannel) return;
+
+    destroyCurrentHls();
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+
+    loadStream(activeChannel);
+  });
+}
+
 function handleFirstInteraction() {
-  if (userInteracted || !video) return;
+  if (demoExpired || serviceExpired || userInteracted || !video) return;
   userInteracted = true;
   video.muted = false;
   video.play().catch(() => {});

@@ -210,6 +210,7 @@
       color: var(--muted);
       font-size: 0.9rem;
       line-height: 1.7;
+      text-align: center;
     }
 
     .demo-box {
@@ -335,6 +336,10 @@
       margin:0 auto 18px auto;
       filter: drop-shadow(0 0 8px rgba(255,255,255,0.25));
     }
+
+    .login-subtext{
+      text-align:center;
+    }
   </style>
 </head>
 <body>
@@ -343,13 +348,11 @@
       <div class="brand">
         <div class="brand-badge">
           <span class="status-dot"></span>
-          Acceso seguro IPTV
+          Acceso seguro
         </div>
 
         <img src="/img/logo.png" alt="Deportes Premium" class="login-logo">
-        <p>
-          Inicia sesión para acceder al reproductor, a la lista de canales y a tu panel de streaming.
-        </p>
+        <p class="login-subtext">Inicia sesión para acceder.</p>
       </div>
 
       <form id="loginForm">
@@ -380,17 +383,11 @@
         <button class="login-btn" type="submit">Entrar al sistema</button>
         <div class="error" id="errorBox"></div>
 
-        <div id="activeSessionsBox" class="active-sessions-box" hidden>
-          <h3>Conexiones activas</h3>
-          <p class="active-sessions-help">
-            Ya alcanzaste el máximo permitido. Puedes cerrar una conexión activa y volver a ingresar.
-          </p>
-          <div id="activeSessionsList"></div>
-        </div>
       </form>
 
       <div class="login-footer">
-        Interfaz visual estilo IPTV moderna, pensada para escritorio, móvil y Android TV.
+        Acceso solo para usuarios registrados.<br>
+        pensada para escritorio, móvil y Android TV.
       </div>
     </div>
   </div>
@@ -406,9 +403,7 @@
 
     const loginForm = document.getElementById("loginForm");
     const errorBox = document.getElementById("errorBox");
-    const activeSessionsBox = document.getElementById("activeSessionsBox");
-    const activeSessionsList = document.getElementById("activeSessionsList");
-
+    
     function escapeHtml(text) {
       return String(text ?? "")
         .replace(/&/g, "&amp;")
@@ -418,80 +413,11 @@
         .replace(/'/g, "&#039;");
     }
 
-    function renderActiveSessions(sessions, username, password) {
-      activeSessionsList.innerHTML = "";
-
-      if (!sessions || !sessions.length) {
-        activeSessionsBox.hidden = true;
-        return;
-      }
-
-      activeSessionsBox.hidden = false;
-
-      sessions.forEach((session) => {
-        const card = document.createElement("div");
-        card.className = "session-card";
-
-        card.innerHTML = `
-          <div class="session-meta"><strong>IP:</strong> ${escapeHtml(session.ip_address || "-")}</div>
-          <div class="session-meta"><strong>Dispositivo:</strong> ${escapeHtml(session.user_agent || "-")}</div>
-          <div class="session-meta"><strong>Creada:</strong> ${escapeHtml(session.created_at || "-")}</div>
-          <div class="session-meta"><strong>Última actividad:</strong> ${escapeHtml(session.last_seen || "-")}</div>
-          <button class="close-session-btn" type="button">Cerrar esta conexión</button>
-        `;
-
-        const btn = card.querySelector(".close-session-btn");
-
-        btn.addEventListener("click", async () => {
-          btn.disabled = true;
-          btn.textContent = "Cerrando conexión...";
-
-          try {
-            const response = await fetch("/api/close-session", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                username,
-                password,
-                sessionId: session.session_id
-              })
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-              errorBox.textContent = data.message || "No se pudo cerrar la conexión";
-              btn.disabled = false;
-              btn.textContent = "Cerrar esta conexión";
-              return;
-            }
-
-            errorBox.textContent = "Conexión cerrada. Intenta ingresar de nuevo.";
-            card.remove();
-
-            if (!activeSessionsList.children.length) {
-              activeSessionsBox.hidden = true;
-            }
-          } catch (error) {
-            errorBox.textContent = "Error de conexión al cerrar la sesión";
-            btn.disabled = false;
-            btn.textContent = "Cerrar esta conexión";
-          }
-        });
-
-        activeSessionsList.appendChild(card);
-      });
-    }
-
-    loginForm.addEventListener("submit", async (event) => {
+      loginForm.addEventListener("submit", async (event) => {
       event.preventDefault();
 
       errorBox.textContent = "";
-      activeSessionsBox.hidden = true;
-      activeSessionsList.innerHTML = "";
-
+      
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value.trim();
 
