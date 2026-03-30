@@ -10,6 +10,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_PATH = process.env.DB_PATH || "./database.db";
 
+console.log("RUTA DE BASE DE DATOS:", DB_PATH);
+
 const db = new sqlite3.Database(DB_PATH);
 
 // =========================
